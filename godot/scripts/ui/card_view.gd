@@ -85,7 +85,7 @@ func display_name() -> String:
 
 func description() -> String:
 	if locked:
-		return "%s kart. Turları geçtikçe ve başarımlarla açılır." % Data.RARITY[rarity()].name
+		return "%s kart. Oynadıkça açılır." % Data.RARITY[rarity()].name
 	if charm_id != "":
 		var s: String = Data.CHARM[charm_id].text
 		if int(charm_state.get("m", 0)) > 0:

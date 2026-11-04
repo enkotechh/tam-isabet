@@ -50,6 +50,21 @@ func _ready() -> void:
 	main.show_classes()
 	await wait(0.8)
 	shot("08_siniflar")
+
+	main.show_builder("guard")
+	await wait(0.8)
+	shot("09_deste_sinif")
+	main.B.list = main.B.list.slice(0, 22)
+	main._builder_add("n-red-9", main.bui.cells.values()[0].view)
+	main.B.open = true
+	main._builder_update()
+	await wait(0.6)
+	shot("10_deste_liste")
+	main.B.open = false
+	main.B.tab = "neutral"
+	main._builder_grid()
+	await wait(0.6)
+	shot("11_deste_notr")
 	get_tree().quit()
 
 func wait(s: float) -> void:

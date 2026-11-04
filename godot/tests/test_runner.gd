@@ -14,6 +14,7 @@ func _ready() -> void:
 	test_scoring()
 	test_tutorial()
 	test_shop()
+	test_decks()
 	simulate()
 	print("\nSONUÇ: %d geçti, %d kaldı" % [passed, failed])
 	get_tree().quit(1 if failed > 0 else 0)
@@ -132,6 +133,22 @@ func test_shop() -> void:
 	check(r.shop.reroll_cost == cost + 1, "yenileme ücreti arttı")
 	check(r.remove_card_paid(r.master[0].uid), "kart çıkarıldı")
 	check(not r.remove_card_paid(r.master[0].uid), "tüccar başına bir kez çıkarılır")
+
+func test_decks() -> void:
+	print("Desteler")
+	Progress.p = Progress.fresh()
+	Progress.decks = {}
+	check(Progress.deck_for("guard") == Data.RECOMMENDED.guard, "kayıt yoksa önerilen deste")
+	var custom: Array = Data.RECOMMENDED.guard.duplicate()
+	custom[0] = "n-red-9"
+	Progress.save_deck("guard", custom)
+	check(Progress.deck_for("guard") == custom, "kayıtlı 24 kartlık deste kullanılır")
+	custom[1] = "timewarp"
+	Progress.save_deck("guard", custom)
+	check(Progress.deck_for("guard") == Data.RECOMMENDED.guard, "kilitli kart içeren deste reddedilir")
+	Progress.save_deck("guard", custom.slice(0, 20))
+	check(Progress.deck_for("guard") == Data.RECOMMENDED.guard, "24 kart olmayan deste reddedilir")
+	Progress.decks = {}
 
 ## Bot: elindeki her alt kümeyi deneyip isabet arar. strong: en yüksek skoru seçer.
 func bot_game(r: RunState, strong: bool) -> int:

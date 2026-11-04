@@ -222,6 +222,9 @@ func show_splash() -> void:
 		else:
 			show_classes())
 	menu.add_child(start)
+	var coll := UIKit.button("Koleksiyon ve Desteler")
+	coll.pressed.connect(func(): show_classes("Koleksiyon ve Desteler"))
+	menu.add_child(coll)
 	var ach := UIKit.button("Başarımlar")
 	ach.pressed.connect(func(): open_modal({"type": "achievements"}))
 	menu.add_child(ach)
@@ -243,7 +246,7 @@ func show_splash() -> void:
 	_render_coach()
 
 # ───────── Sınıf seçimi ─────────
-func show_classes() -> void:
+func show_classes(head := "Sınıfını Seç") -> void:
 	screen = "classes"
 	var root := _screen_root()
 	var bar := UIKit.hbox(10)
@@ -251,7 +254,7 @@ func show_classes() -> void:
 	back.custom_minimum_size = Vector2(44, 40)
 	back.pressed.connect(show_splash)
 	bar.add_child(back)
-	var t := UIKit.title("Sınıfını Seç", 22)
+	var t := UIKit.title(head, 22)
 	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bar.add_child(t)
@@ -307,12 +310,239 @@ func _class_panel(k: String) -> Control:
 		var n_open := Data.SPECIAL_CARDS.filter(func(c): return c.cls == k and Progress.is_unlocked(c.id)).size()
 		var n_all := Data.SPECIAL_CARDS.filter(func(c): return c.cls == k).size()
 		v.add_child(UIKit.label("Sınıf kartları: %d/%d açık" % [n_open, n_all], 12, UIKit.MUTED))
+		var custom: bool = Progress.deck_for(k) != Data.RECOMMENDED[k]
+		v.add_child(UIKit.label("Kendi desteni kullanıyorsun." if custom else "Önerilen deste kullanılıyor.", 12, UIKit.MUTED))
+		var btns := UIKit.hbox(10)
+		btns.alignment = BoxContainer.ALIGNMENT_END
+		var edit := UIKit.button("Desteyi Düzenle", false, true)
+		edit.pressed.connect(func(): show_builder(k))
+		btns.add_child(edit)
 		var play := UIKit.button("Oyna", true, true)
-		play.size_flags_horizontal = Control.SIZE_SHRINK_END
-		play.custom_minimum_size.x = 120
+		play.custom_minimum_size.x = 110
 		play.pressed.connect(func(): start_run(k))
-		v.add_child(play)
+		btns.add_child(play)
+		v.add_child(btns)
 	return p
+
+# ───────── Deste oluşturucu (koleksiyon) ─────────
+var B: Dictionary = {}       ## {cls, list, tab, open}
+var bui: Dictionary = {}     ## deste oluşturucu öğeleri
+
+func show_builder(cls: String) -> void:
+	screen = "builder"
+	B = {"cls": cls, "list": Progress.deck_for(cls).duplicate(), "tab": "class", "open": false}
+	bui = {}
+	var root := _screen_root()
+	root.add_theme_constant_override("separation", 8)
+	var bar := UIKit.hbox(10)
+	var back := UIKit.button("‹", false, true)
+	back.custom_minimum_size = Vector2(44, 40)
+	back.pressed.connect(func(): show_classes("Koleksiyon ve Desteler"))
+	bar.add_child(back)
+	var t := UIKit.title("%s Destesi" % Data.CLASSES[cls].name, 20)
+	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	bar.add_child(t)
+	bui.count = UIKit.title("", 16, UIKit.GOLD_3)
+	bui.count.custom_minimum_size.x = 56
+	bui.count.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	bar.add_child(bui.count)
+	root.add_child(bar)
+
+	var tabs := UIKit.hbox(6)
+	bui.tabs = {}
+	for tab in [["class", Data.CLASSES[cls].name], ["neutral", "Nötr"], ["num", "Sayılar"]]:
+		var tb := UIKit.button(tab[1], false, true)
+		tb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var key: String = tab[0]
+		tb.pressed.connect(func():
+			B.tab = key
+			_builder_grid())
+		tabs.add_child(tb)
+		bui.tabs[key] = tb
+	root.add_child(tabs)
+	bui.hint = UIKit.wrap(UIKit.label("", 13, UIKit.MUTED))
+	root.add_child(bui.hint)
+
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	bui.scroll = scroll
+	root.add_child(scroll)
+	var flow := HFlowContainer.new()
+	flow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	flow.alignment = FlowContainer.ALIGNMENT_CENTER
+	flow.add_theme_constant_override("h_separation", 8)
+	flow.add_theme_constant_override("v_separation", 12)
+	bui.flow = flow
+	scroll.add_child(flow)
+
+	var deckbar := UIKit.panel(Color("2a1a0e"), 16, 2, UIKit.GOLD_1)
+	var dv := UIKit.vbox(8)
+	deckbar.add_child(dv)
+	var tg := Button.new()
+	tg.flat = true
+	tg.focus_mode = Control.FOCUS_NONE
+	tg.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	tg.add_theme_color_override("font_color", UIKit.INK)
+	tg.add_theme_font_size_override("font_size", 14)
+	tg.pressed.connect(func():
+		B.open = not B.open
+		_builder_list())
+	bui.toggle = tg
+	dv.add_child(tg)
+	var ls := ScrollContainer.new()
+	ls.custom_minimum_size.y = 230
+	ls.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	bui.list_scroll = ls
+	var lv := UIKit.vbox(4)
+	lv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bui.list = lv
+	ls.add_child(lv)
+	dv.add_child(ls)
+	var brow := UIKit.hbox(8)
+	var rec := UIKit.button("Önerilen", false, true)
+	rec.pressed.connect(func():
+		B.list = Data.RECOMMENDED[B.cls].duplicate()
+		_builder_update())
+	var clr := UIKit.button("Temizle", false, true)
+	clr.pressed.connect(func():
+		B.list = []
+		_builder_update())
+	var save := UIKit.button("Kaydet ve Oyna", true, true)
+	save.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	save.pressed.connect(func():
+		if B.list.size() != RunState.DECK_SIZE:
+			return
+		Progress.save_deck(B.cls, B.list)
+		start_run(B.cls))
+	bui.save = save
+	brow.add_child(rec)
+	brow.add_child(clr)
+	brow.add_child(save)
+	dv.add_child(brow)
+	root.add_child(deckbar)
+	await get_tree().process_frame
+	_builder_grid()
+
+func _builder_pool() -> Array:
+	var pool: Array
+	if B.tab == "num":
+		pool = Data.NUMBER_CARDS.duplicate()
+	elif B.tab == "class":
+		pool = Data.SPECIAL_CARDS.filter(func(c): return c.cls == B.cls)
+	else:
+		pool = Data.SPECIAL_CARDS.filter(func(c): return c.cls == "neutral" and not c.get("no_collect", false))
+	pool.sort_custom(Data.by_rarity)
+	return pool.map(func(c): return c.id)
+
+func _max_copies(id: String) -> int:
+	return int(Data.RARITY[Data.CARD[id].rarity].max)
+
+## Sekme değişince ızgarayı baştan kurar
+func _builder_grid() -> void:
+	if screen != "builder":
+		return
+	for ch in bui.flow.get_children():
+		ch.queue_free()
+	bui.cells = {}
+	var cw := minf(104.0, (bui.scroll.size.x - 24) / 3.0)
+	for id in _builder_pool():
+		var cell := UIKit.vbox(2)
+		var cv := CardView.new()
+		cv.card = {"tid": id}
+		cv.set_width(cw)
+		var open := Progress.is_unlocked(id)
+		cv.locked = not open
+		if open:
+			var cid: String = id
+			cv.pressed.connect(func(v): _builder_add(cid, v))
+		cell.add_child(cv)
+		var cnt := UIKit.label("", 12, UIKit.GOLD_3, UIKit.bold_font(), HORIZONTAL_ALIGNMENT_CENTER)
+		cell.add_child(cnt)
+		bui.flow.add_child(cell)
+		bui.cells[id] = {"view": cv, "count": cnt}
+	bui.scroll.scroll_vertical = 0
+	_builder_update()
+
+## Sayaçları, ipucunu, listeyi ve düğmeleri günceller (ızgarayı yeniden kurmadan)
+func _builder_update() -> void:
+	var n: int = B.list.size()
+	bui.count.text = "%d/%d" % [n, RunState.DECK_SIZE]
+	bui.count.add_theme_color_override("font_color", UIKit.HIT if n == RunState.DECK_SIZE else UIKit.GOLD_3)
+	for key in bui.tabs:
+		var on: bool = key == B.tab
+		bui.tabs[key].add_theme_stylebox_override("normal", UIKit.box(UIKit.GOLD_2 if on else Color(0, 0, 0, 0.35), 10, 1, UIKit.GOLD_0))
+		bui.tabs[key].add_theme_color_override("font_color", Color("3a2306") if on else UIKit.MUTED)
+	var pool := _builder_pool()
+	var open := pool.filter(Progress.is_unlocked).size()
+	var nums: int = B.list.filter(func(id): return Data.CARD[id].kind == "num").size()
+	bui.hint.text = "Bu sekmede %d/%d kart açık. Nadirliğe göre sıralı: beyaz, mavi, mor, sarı, kırmızı. Aynı karttan en fazla 2, efsanevi ve epik karttan 1 tane. Destende %d sayı kartı var." % [open, pool.size(), nums]
+	for id in bui.cells:
+		var k: int = B.list.count(id)
+		var mx := _max_copies(id)
+		var cell: Dictionary = bui.cells[id]
+		cell.count.text = ("%d/%d" % [k, mx]) if k > 0 else " "
+		cell.view.dimmed = Progress.is_unlocked(id) and (k >= mx or n >= RunState.DECK_SIZE)
+		cell.view.selected = k > 0
+		cell.view.queue_redraw()
+	bui.save.disabled = n != RunState.DECK_SIZE
+	bui.save.text = "Kaydet ve Oyna" if n == RunState.DECK_SIZE else "%d kart eksik" % (RunState.DECK_SIZE - n)
+	_builder_list()
+
+func _builder_list() -> void:
+	var n: int = B.list.size()
+	bui.toggle.text = "%s  Deste listesi · %d/%d kart" % ["▾" if B.open else "▸", n, RunState.DECK_SIZE]
+	bui.list_scroll.visible = B.open
+	for ch in bui.list.get_children():
+		ch.queue_free()
+	if not B.open:
+		return
+	var uniq: Array = []
+	for id in B.list:
+		if not id in uniq:
+			uniq.append(id)
+	var defs: Array = uniq.map(func(id): return Data.CARD[id])
+	defs.sort_custom(Data.by_rarity)
+	if defs.is_empty():
+		bui.list.add_child(UIKit.label("Desten boş. Yukarıdaki kartlara dokunarak ekle.", 13, UIKit.MUTED))
+	for t in defs:
+		var cc: Array = Data.CLASS_COLORS.get(t.cls, Data.CLASS_COLORS.neutral)
+		var row := Button.new()
+		row.focus_mode = Control.FOCUS_NONE
+		row.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		var gem: String = str(t.value) if t.kind == "num" else str(t.get("gem", "✦"))
+		row.text = "%s   %s   ×%d" % [gem, t.name, B.list.count(t.id)]
+		row.tooltip_text = "Desteden bir tane çıkar"
+		var rs := UIKit.box(cc[1], 8, 2, Data.RARITY[t.rarity].color)
+		rs.content_margin_top = 6
+		rs.content_margin_bottom = 6
+		row.add_theme_stylebox_override("normal", rs)
+		row.add_theme_stylebox_override("hover", rs)
+		row.add_theme_stylebox_override("pressed", rs)
+		row.add_theme_color_override("font_color", UIKit.INK)
+		row.add_theme_font_size_override("font_size", 14)
+		var rid: String = t.id
+		row.pressed.connect(func():
+			var i: int = B.list.rfind(rid)
+			if i >= 0:
+				B.list.remove_at(i)
+			_builder_update())
+		var minus := UIKit.label("−", 18, UIKit.MISS, UIKit.bold_font())
+		minus.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
+		minus.position.x -= 14
+		minus.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(minus)
+		bui.list.add_child(row)
+
+func _builder_add(id: String, v: CardView) -> void:
+	if B.list.size() >= RunState.DECK_SIZE or B.list.count(id) >= _max_copies(id):
+		pop(v, 0.94)
+		return
+	B.list.append(id)
+	pop(v, 1.08)
+	burst(v.get_global_rect().get_center(), [Data.RARITY[Data.CARD[id].rarity].color, Color.WHITE], 14, 160, 0)
+	_builder_update()
 
 # ───────── Oyun ─────────
 func start_run(cls: String, tutorial := false) -> void:

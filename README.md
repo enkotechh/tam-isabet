@@ -94,7 +94,7 @@ godot/tests/                     test_runner (kurallar + bot simülasyonu), shot
 
 - **Açmak:** Godot 4.7 → Import → `godot/project.godot`
 - **Testler:** `godot --headless --path godot res://tests/test_runner.tscn` (çıkış kodu 0 = hepsi geçti)
-- **Durum:** Açılış menüsü, öğretici, sınıf seçimi, oyun masası (yelpaze el, Puan × Çarpan sayımı), olaylar, ganimet, tüccar, başarım bildirimleri ve efektler hazır. Henüz yok: deste oluşturucu ekranı, ses, iOS dışa aktarma ayarları.
+- **Durum:** Açılış menüsü, öğretici, sınıf seçimi, oyun masası (yelpaze el, Puan × Çarpan sayımı), olaylar, ganimet, tüccar, başarım bildirimleri, efektler ve deste oluşturucu (Koleksiyon ve Desteler) hazır. Henüz yok: ses, iOS dışa aktarma ayarları.
 - **iOS'a çıkarmak (Mac'te):** Godot'da Editor → Manage Export Templates ile şablonları indir, Project → Export → iOS ön ayarını ekle, Apple Developer ekip kimliğini gir, Xcode projesi olarak dışa aktar ve Xcode'da çalıştır.
 
 ## Sonraki adımlar (iOS)
