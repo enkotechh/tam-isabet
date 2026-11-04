@@ -138,6 +138,7 @@ static func button(text: String, gold := false, small := false) -> Button:
 	b.add_theme_color_override("font_hover_color", fc)
 	b.add_theme_color_override("font_pressed_color", fc)
 	b.add_theme_color_override("font_disabled_color", Color("8a8070"))
+	b.pressed.connect(func(): Sfx.play("click"))
 	return b
 
 static func panel(bg := Color(0, 0, 0, 0.38), radius := 14, border := 0, border_col := GOLD_0) -> PanelContainer:

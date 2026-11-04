@@ -15,6 +15,7 @@ boot_splash/bg_color=Color(0.086, 0.055, 0.035, 1)
 
 Data="*res://scripts/data/game_data.gd"
 Progress="*res://scripts/core/progress.gd"
+Sfx="*res://scripts/core/sfx.gd"
 
 [display]
 

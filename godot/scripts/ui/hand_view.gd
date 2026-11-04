@@ -63,6 +63,7 @@ func sync(run: RunState) -> void:
 		tw.tween_property(v, "rotation", rot, 0.4 if is_new else 0.2).set_delay(delay)
 		tw.tween_property(v, "scale", Vector2(1.07, 1.07) if v.selected else Vector2.ONE, 0.4 if is_new else 0.2).set_delay(delay)
 		if is_new:
+			get_tree().create_timer(delay).timeout.connect(func(): Sfx.play("draw", randf_range(0.85, 1.2), -4.0))
 			k += 1
 
 ## Seçili kartların görünümlerini elden ayırır (oynama animasyonu için)

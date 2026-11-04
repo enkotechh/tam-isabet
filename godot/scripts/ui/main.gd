@@ -238,12 +238,26 @@ func show_splash() -> void:
 	row.add_child(tb)
 	row.add_child(hb)
 	menu.add_child(row)
+	var snd := UIKit.button(_sound_label(), false, true)
+	snd.pressed.connect(func(): snd.text = _toggle_sound())
+	menu.add_child(snd)
 
 	var total := Data.UNLOCK_ORDER.size() + Data.NUMBER_CARDS.size()
 	var best := UIKit.label("REKOR  %d" % Progress.best, 14, UIKit.GOLD_3, UIKit.title_font(), HORIZONTAL_ALIGNMENT_CENTER)
 	root.add_child(best)
 	root.add_child(UIKit.label("%d/%d kart ve tılsım açık · %d/%d başarım" % [Progress.p.unlocked.size(), total, Progress.p.ach.size(), Data.ACHIEVEMENTS.size()], 13, UIKit.MUTED, null, HORIZONTAL_ALIGNMENT_CENTER))
 	_render_coach()
+
+func _sound_label() -> String:
+	return "Ses: Açık" if Sfx.enabled else "Ses: Kapalı"
+
+## Sesi açar/kapatır, tercihi kaydeder ve yeni düğme yazısını döner
+func _toggle_sound() -> String:
+	Sfx.enabled = not Sfx.enabled
+	Progress.p["sound"] = Sfx.enabled
+	Progress.save()
+	Sfx.play("click")
+	return _sound_label()
 
 # ───────── Sınıf seçimi ─────────
 func show_classes(head := "Sınıfını Seç") -> void:
@@ -538,8 +552,10 @@ func _builder_list() -> void:
 func _builder_add(id: String, v: CardView) -> void:
 	if B.list.size() >= RunState.DECK_SIZE or B.list.count(id) >= _max_copies(id):
 		pop(v, 0.94)
+		Sfx.play("deny")
 		return
 	B.list.append(id)
+	Sfx.play("select")
 	pop(v, 1.08)
 	burst(v.get_global_rect().get_center(), [Data.RARITY[Data.CARD[id].rarity].color, Color.WHITE], 14, 160, 0)
 	_builder_update()
@@ -939,6 +955,7 @@ func _on_card(card_uid: int) -> void:
 	if busy or not run.modal.is_empty():
 		return
 	last_tap = card_uid
+	Sfx.play("select", 1.1 if card_uid in run.sel else 0.95)
 	run.toggle(card_uid)
 	refresh()
 
@@ -990,6 +1007,7 @@ func _animate_spell(views: Array) -> void:
 		t2.tween_property(v, "modulate", Color(3, 3, 3, 0), 0.3)
 		ring(center, col, 140)
 		burst(center, [col, Color.WHITE], 50, 340, 0)
+		Sfx.play("spell")
 		await t2.finished
 		v.queue_free()
 
@@ -1002,6 +1020,7 @@ func _animate_play(views: Array, lp: Dictionary) -> void:
 	var n := views.size()
 	var w := minf(62.0, (zone.size.x - 8 * (n - 1)) / maxf(1, n))
 	var total := n * w + (n - 1) * 8
+	Sfx.play("whoosh")
 	var tw := create_tween().set_parallel(true).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	for i in n:
 		var v: CardView = views[i]
@@ -1016,6 +1035,7 @@ func _animate_play(views: Array, lp: Dictionary) -> void:
 	if not lp.get("hit", false):
 		await get_tree().create_timer(0.25).timeout
 		floater("Iska", dial_c + Vector2(0, -60), UIKit.MISS)
+		Sfx.play("miss")
 		flash(Color(1, 0.2, 0.15, 0.35))
 		var t2 := create_tween().set_parallel(true).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		for i in n:
@@ -1038,6 +1058,10 @@ func _animate_play(views: Array, lp: Dictionary) -> void:
 		chips_l.text = str(s.chips)
 		mult_l.text = RunState.fmt_mult(s.mult)
 		pop(ui.chips_box if s.kind == "chips" else ui.mult_box, 1.25)
+		match s.kind:
+			"chips": Sfx.play("chip", 1.0 + i * 0.06)
+			"mult": Sfx.play("mult", 1.0 + i * 0.03)
+			_: Sfx.play("xmult")
 		var src: Control = null
 		match s.src.t:
 			"card":
@@ -1069,6 +1093,7 @@ func _animate_play(views: Array, lp: Dictionary) -> void:
 	await t3.finished
 	for v in views:
 		v.queue_free()
+	Sfx.play("hit", 1.12 if sc.combo else 1.0)
 	ring(dial_c, Color("ffd25a") if sc.combo else UIKit.GOLD_3, 130)
 	burst(dial_c, [UIKit.GOLD_3, UIKit.GOLD_2, UIKit.HIT, Color("ff5a4b"), Color("4b8dff")], 110 if sc.combo else 60)
 	floater("Renk Serisi!" if sc.combo else "Tam İsabet!", dial_c + Vector2(0, -74), UIKit.GOLD_3, 28)
@@ -1090,20 +1115,26 @@ func _play_fx() -> void:
 	for f in q:
 		match f.type:
 			"round":
+				Sfx.play("fanfare")
 				banner("Tur Geçildi", "%d / %d skor" % [run.round_score, run.goal])
 				burst(vp * Vector2(0.5, 0.4), [UIKit.GOLD_3, UIKit.GOLD_2, UIKit.HIT, UIKit.SPELL, Color("4b8dff"), Color("ff5a4b")], 140, 600)
 			"boss":
+				Sfx.play("boss")
 				banner(Data.BOSSES[run.boss].name, Data.BOSSES[run.boss].text)
 				flash(Color(1, 0.15, 0.15, 0.4))
 			"life_lost":
+				Sfx.play("life_lost")
 				flash(Color(1, 0.1, 0.2, 0.6))
 				shake(content)
 			"shield":
+				Sfx.play("shield")
 				flash(Color(0.4, 0.7, 1, 0.5))
 			"heal":
+				Sfx.play("heal")
 				if ui.has("hearts"):
 					burst(ui.hearts.get_global_rect().get_center(), [UIKit.HEART, Color("ff9aa9")], 24, 200, 0)
 			"power":
+				Sfx.play("power")
 				if ui.has("portrait"):
 					var pc: Vector2 = ui.portrait.get_global_rect().get_center()
 					ring(pc, Data.CLASS_COLORS[run.cls][0].lightened(0.4), 70)
@@ -1112,12 +1143,13 @@ func _play_fx() -> void:
 			"spell":
 				floater(f.name, vp * Vector2(0.5, 0.42) + Vector2(0, -90), Color("ecd6ff"), 26)
 			"event":
+				Sfx.play({"good": "event_good", "bad": "event_bad"}.get(f.tone, "event"))
 				var col: Color = {"good": UIKit.HIT, "bad": UIKit.MISS}.get(f.tone, UIKit.GOLD_2)
 				burst(vp * Vector2(0.5, 0.35), [col, Color.WHITE], 40, 300, 0)
 				if f.tone == "bad":
 					flash(Color(1, 0.3, 0.2, 0.3))
 			"buy":
-				pass
+				Sfx.play("coin")
 
 # ───────── Pencereler ─────────
 func open_modal(m: Dictionary) -> void:
@@ -1347,6 +1379,9 @@ func _fill_sheet(v: VBoxContainer, m: Dictionary) -> void:
 				run.modal = {}
 				refresh())
 			_btn(v, "Nasıl oynanır", false, func(): _show_sheet({"type": "howto"}))
+			var snd := UIKit.button(_sound_label())
+			snd.pressed.connect(func(): snd.text = _toggle_sound())
+			v.add_child(snd)
 			_btn(v, "Ana menü", false, func():
 				run.modal = {}
 				show_splash())
@@ -1470,6 +1505,7 @@ func _fill_shop(v: VBoxContainer) -> void:
 			var sb := UIKit.button("Sat +%d" % run.charm_sell_price(run.charms[i].cid), false, true)
 			sb.add_theme_font_size_override("font_size", 11)
 			sb.pressed.connect(func():
+				Sfx.play("coin", 0.85)
 				run.sell_charm(idx)
 				refresh())
 			row3.add_child(_ware(cv, sb))
@@ -1633,6 +1669,7 @@ func _next_toast() -> void:
 	p.position.y += 60
 	var tw := create_tween().set_parallel(true).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(p, "modulate:a", 1.0, 0.35)
+	Sfx.play("achievement", 1.0 if t.kind == "ach" else 1.25, 0.0 if t.kind == "ach" else -5.0)
 	burst(Vector2(vp.x / 2 - w / 2 + 33, vp.y - safe.bottom - 40), [Color("f5c518"), Color.WHITE], 20, 160, 0)
 	await get_tree().create_timer(3.0).timeout
 	var out := create_tween()

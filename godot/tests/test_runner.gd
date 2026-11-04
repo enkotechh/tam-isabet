@@ -15,6 +15,7 @@ func _ready() -> void:
 	test_tutorial()
 	test_shop()
 	test_decks()
+	test_sfx()
 	simulate()
 	print("\nSONUÇ: %d geçti, %d kaldı" % [passed, failed])
 	get_tree().quit(1 if failed > 0 else 0)
@@ -133,6 +134,27 @@ func test_shop() -> void:
 	check(r.shop.reroll_cost == cost + 1, "yenileme ücreti arttı")
 	check(r.remove_card_paid(r.master[0].uid), "kart çıkarıldı")
 	check(not r.remove_card_paid(r.master[0].uid), "tüccar başına bir kez çıkarılır")
+
+func test_sfx() -> void:
+	print("Sesler")
+	var t0 := Time.get_ticks_msec()
+	Sfx._build()
+	print("  %d ses %d ms'de üretildi" % [Sfx.streams.size(), Time.get_ticks_msec() - t0])
+	check(Sfx.streams.size() >= 22, "en az 22 ses var")
+	var silent: Array = []
+	for name in Sfx.streams:
+		var d: PackedByteArray = Sfx.streams[name].data
+		var peak := 0
+		for i in range(0, d.size() - 1, 16):
+			peak = maxi(peak, absi(d.decode_s16(i)))
+		if peak < 2000:
+			silent.append(name)
+	check(silent.is_empty(), "sessiz ses yok " + str(silent))
+	for name in ["click", "select", "chip", "hit", "miss", "fanfare", "achievement"]:
+		check(Sfx.streams.has(name), "ses var: " + name)
+	Sfx.play("chip", 1.2)
+	Sfx.play("bilinmeyen")
+	check(true, "çalma çağrıları hata vermedi")
 
 func test_decks() -> void:
 	print("Desteler")

@@ -86,7 +86,8 @@ Web prototipi Godot 4.7'ye taşınıyor. Kurallar, veriler ve dengeler web sür�
 godot/project.godot              dikey ekran (390×844), GL Compatibility (iOS uyumlu)
 godot/scripts/data/game_data.gd  autoload "Data": kartlar, tılsımlar, sınıflar, bekçiler, olaylar, başarımlar
 godot/scripts/core/run_state.gd  RunState: bir oyunun tüm kuralları (arayüzden bağımsız, test edilebilir)
-godot/scripts/core/progress.gd   autoload "Progress": kilitler, başarımlar, rekor (user://progress.json)
+godot/scripts/core/progress.gd   autoload "Progress": kilitler, başarımlar, rekor, ses tercihi (user://progress.json)
+godot/scripts/core/sfx.gd        autoload "Sfx": 22 ses efekti, dosyasız, açılışta kodla sentezlenir
 godot/scripts/ui/                arayüz: main.gd (ekranlar, pencereler, efektler), card_view.gd, hand_view.gd, ui_kit.gd
 godot/assets/icons/              SVG ikonlar
 godot/tests/                     test_runner (kurallar + bot simülasyonu), shots (ekran görüntüsü turu)
@@ -94,7 +95,7 @@ godot/tests/                     test_runner (kurallar + bot simülasyonu), shot
 
 - **Açmak:** Godot 4.7 → Import → `godot/project.godot`
 - **Testler:** `godot --headless --path godot res://tests/test_runner.tscn` (çıkış kodu 0 = hepsi geçti)
-- **Durum:** Açılış menüsü, öğretici, sınıf seçimi, oyun masası (yelpaze el, Puan × Çarpan sayımı), olaylar, ganimet, tüccar, başarım bildirimleri, efektler ve deste oluşturucu (Koleksiyon ve Desteler) hazır. Henüz yok: ses, iOS dışa aktarma ayarları.
+- **Durum:** Açılış menüsü, öğretici, sınıf seçimi, oyun masası (yelpaze el, Puan × Çarpan sayımı), olaylar, ganimet, tüccar, başarım bildirimleri, efektler, deste oluşturucu (Koleksiyon ve Desteler) ve ses efektleri (menüden açılıp kapatılabilir) hazır. Henüz yok: müzik, iOS dışa aktarma ayarları.
 - **iOS'a çıkarmak (Mac'te):** Godot'da Editor → Manage Export Templates ile şablonları indir, Project → Export → iOS ön ayarını ekle, Apple Developer ekip kimliğini gir, Xcode projesi olarak dışa aktar ve Xcode'da çalıştır.
 
 ## Sonraki adımlar (iOS)
