@@ -1,0 +1,125 @@
+<title>Tam İsabet</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:ital,wght@0,500;0,600;0,700;0,800;0,900;1,600&family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@600;700;900&display=swap">
+<link rel="stylesheet" href="css/style.css">
+
+<div class="vignette-bg" aria-hidden="true"></div>
+
+<!-- Açılış menüsü -->
+<section class="screen splash" id="scr-splash">
+  <div class="splash-stage">
+    <div class="splash-cards" id="splashCards" aria-hidden="true"></div>
+    <h1 class="logo"><span class="logo-small">TAM</span><span class="logo-big">İsabet</span></h1>
+    <p class="tagline">Hedefi tuttur. Desteni kur. Kaderi yen.</p>
+  </div>
+  <nav class="menu" aria-label="Ana menü">
+    <button class="plaque gold" id="btnContinue" type="button" hidden>Maceraya Devam Et</button>
+    <button class="plaque gold" id="btnStart" type="button">Maceraya Başla</button>
+    <button class="plaque" id="btnDecks" type="button">Koleksiyon ve Desteler</button>
+    <button class="plaque" id="btnAch" type="button">Başarımlar</button>
+    <div class="menurow">
+      <button class="plaque small" id="btnTutorial" type="button">Öğretici</button>
+      <button class="plaque small" id="btnHowto" type="button">Nasıl Oynanır</button>
+    </div>
+  </nav>
+  <p class="splash-best">Rekor <b id="splashBest">0</b></p>
+  <p class="splash-prog" id="splashProg"></p>
+</section>
+
+<!-- Sınıf seçimi -->
+<section class="screen" id="scr-classes" hidden>
+  <header class="bar">
+    <button class="iconbtn" data-back="splash" type="button" aria-label="Ana menüye dön">‹</button>
+    <h2 id="classesTitle">Sınıfını Seç</h2>
+    <span style="width:40px"></span>
+  </header>
+  <div class="class-grid" id="classGrid"></div>
+</section>
+
+<!-- Deste oluşturucu -->
+<section class="screen builder" id="scr-builder" hidden>
+  <header class="bar">
+    <button class="iconbtn" data-back="classes" type="button" aria-label="Sınıflara dön">‹</button>
+    <h2 id="bTitle">Deste</h2>
+    <span class="bcount" id="bCount">0/24</span>
+  </header>
+  <div class="tabs" role="tablist" id="bTabs">
+    <button role="tab" data-tab="class" type="button" id="tabClass">Sınıf</button>
+    <button role="tab" data-tab="neutral" type="button">Nötr</button>
+    <button role="tab" data-tab="num" type="button">Sayılar</button>
+  </div>
+  <p class="bhint" id="bHint"></p>
+  <div class="coll" id="coll"></div>
+  <footer class="deckbar">
+    <button class="listtoggle" id="bToggle" type="button" aria-expanded="false"><span id="bSummary"></span><span class="chev">▴</span></button>
+    <div class="dlist" id="bList" hidden></div>
+    <div class="brow">
+      <button class="plaque small" id="bRec" type="button">Önerilen</button>
+      <button class="plaque small" id="bClear" type="button">Temizle</button>
+      <button class="plaque gold small" id="bSave" type="button">Kaydet ve Oyna</button>
+    </div>
+  </footer>
+</section>
+
+<!-- Oyun masası -->
+<section class="screen game" id="scr-game" hidden>
+  <header class="gtop">
+    <button class="iconbtn" id="btnPause" type="button" aria-label="Oyun menüsü">☰</button>
+    <div class="hearts" id="hearts"></div>
+    <div class="meta"><span>Kat·Tur<b id="round">1</b></span><span class="goldm"><svg class="coin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="#f5c518" stroke="#7a5800" stroke-width="1.5"/><circle cx="12" cy="12" r="5.5" fill="none" stroke="#b88a0a" stroke-width="1.2"/></svg><b id="gold">0</b></span></div>
+  </header>
+  <div class="charms" id="charms" aria-label="Tılsımlar"></div>
+  <section class="arena" id="arena" aria-live="polite">
+    <div class="hero" id="hero"></div>
+    <div class="dial" id="dial"><div><small>HEDEF</small><b id="target">–</b></div></div>
+    <div class="omen" id="omen"></div>
+  </section>
+  <section class="scorepanel" id="scorepanel">
+    <div class="goalbox">
+      <span class="label" id="roundLabel">Küçük Sınav</span>
+      <div class="goalnum"><b id="rscore">0</b><span>/ <span id="goal">0</span></span></div>
+      <div class="bar"><i id="goalBar"></i></div>
+    </div>
+    <div class="scorebox" id="scorebox" aria-label="Puan çarpı Çarpan">
+      <div class="chips"><small>Puan</small><b id="chips">0</b></div>
+      <span class="xsign">×</span>
+      <div class="mult"><small>Çarpan</small><b id="mult">0</b></div>
+    </div>
+    <div class="res">
+      <span><small>Oynama</small><b id="playsTxt">0</b></span>
+      <span><small>Değiştirme</small><b id="discTxt">0</b></span>
+    </div>
+  </section>
+  <div class="mods" id="mods"></div>
+  <p class="msg" id="msg" aria-live="polite"></p>
+  <div class="preview" id="preview"><span class="expr" id="expr"></span><span class="tot" id="tot"></span></div>
+  <div class="info" id="info"></div>
+  <div class="hand" id="hand"></div>
+  <div class="actions">
+    <button class="plaque" id="swapBtn" type="button">Değiştir</button>
+    <button class="plaque gold" id="playBtn" type="button">Oyna</button>
+  </div>
+  <div class="piles">
+    <div class="pile">
+      <div class="stack" id="stack"><span class="back"></span><span class="back"></span><span class="back"></span></div>
+      <span>Çekme <b id="drawN">0</b></span>
+    </div>
+    <button class="plaque small" id="sortBtn" type="button">Sırala</button>
+    <button class="plaque small" id="deckBtn" type="button">Deste (<span id="deckN">0</span>)</button>
+  </div>
+</section>
+
+<div class="overlay" id="ov" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<div class="coach" id="coach" hidden></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<div class="banner" id="banner" aria-live="polite"></div>
+<div class="vflash" id="vflash" aria-hidden="true"></div>
+<canvas id="fx" aria-hidden="true"></canvas>
+
+<script src="js/data.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/game.js"></script>
