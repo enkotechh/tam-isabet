@@ -78,6 +78,25 @@ tools/serve.ps1   Windows için yerel sunucu
 - **Yeni başarım:** `ACHIEVEMENTS` listesine ekle. Koşulu `js/game.js` içinde `achieve('id')` ile tetikle.
 - **Denge:** `goalFor()` (tur hedefleri), `newTarget()` (hedef sayı aralığı), `RARITY` fiyat/ağırlıkları, `startRun()` başlangıç değerleri (altın, oynama, el boyutu).
 
+## Godot 4 sürümü (iOS hedefi) — `godot/`
+
+Web prototipi Godot 4.7'ye taşınıyor. Kurallar, veriler ve dengeler web sürümüyle aynı.
+
+```
+godot/project.godot              dikey ekran (390×844), GL Compatibility (iOS uyumlu)
+godot/scripts/data/game_data.gd  autoload "Data": kartlar, tılsımlar, sınıflar, bekçiler, olaylar, başarımlar
+godot/scripts/core/run_state.gd  RunState: bir oyunun tüm kuralları (arayüzden bağımsız, test edilebilir)
+godot/scripts/core/progress.gd   autoload "Progress": kilitler, başarımlar, rekor (user://progress.json)
+godot/scripts/ui/                arayüz: main.gd (ekranlar, pencereler, efektler), card_view.gd, hand_view.gd, ui_kit.gd
+godot/assets/icons/              SVG ikonlar
+godot/tests/                     test_runner (kurallar + bot simülasyonu), shots (ekran görüntüsü turu)
+```
+
+- **Açmak:** Godot 4.7 → Import → `godot/project.godot`
+- **Testler:** `godot --headless --path godot res://tests/test_runner.tscn` (çıkış kodu 0 = hepsi geçti)
+- **Durum:** Açılış menüsü, öğretici, sınıf seçimi, oyun masası (yelpaze el, Puan × Çarpan sayımı), olaylar, ganimet, tüccar, başarım bildirimleri ve efektler hazır. Henüz yok: deste oluşturucu ekranı, ses, iOS dışa aktarma ayarları.
+- **iOS'a çıkarmak (Mac'te):** Godot'da Editor → Manage Export Templates ile şablonları indir, Project → Export → iOS ön ayarını ekle, Apple Developer ekip kimliğini gir, Xcode projesi olarak dışa aktar ve Xcode'da çalıştır.
+
 ## Sonraki adımlar (iOS)
 
 - Mac'te SwiftUI + SpriteKit ile ya da Godot/Unity ile taşıma. Oyun mantığı (`evaluate`, `scorePlay`, `play`, `SPELLS`, `EVENTS`, `CHARMS`) arayüzden ayrık olduğu için doğrudan çevrilebilir.
