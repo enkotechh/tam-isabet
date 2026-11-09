@@ -25,16 +25,30 @@ Son güncelleme: 4 Kasım 2026
 - 22 ses efekti, dosya kullanmadan kodla üretiliyor; menüden açılıp kapatılabiliyor
 - Ekran görüntüsü turu testi (`tests/shots.tscn`)
 
+### Art Deco görsel yenileme (9 Kasım 2026)
+- **Palet:** oniks siyahı zemin, parlak altın çizgiler, fildişi yazı alanları. Puan kutusu lacivert, Çarpan kutusu yakut.
+- **Yazı tipleri (OFL, `godot/assets/fonts/`):** Limelight başlıklarda ve düğmelerde, Poiret One süslü alt yazılarda, Josefin Sans gövde metninde ve aralıklı büyük harf etiketlerde.
+- **Kartlar:**
+  - köşeleri kesik oniks gövde, dış çizgi nadirlik renginde, iç çizgi altın
+  - kemerli resim penceresi, arkasında güneş ışınları, altında basamaklı süs
+  - elmas değer taşı, altın çizgili isim bandı, fildişi açıklama kutusu
+  - alt köşelerde yelpazeler, efsanevi ve epik kartlarda yarım güneş arması
+- **Arayüz:**
+  - güneş ışınlı ve yelpaze sıralı zemin
+  - tüm panel ve düğmelerde köşeleri kesik çift altın çizgi (`DecoBox`)
+  - sekizgen hedef kadranı, elmaslı süs çizgileri
+- Fon müziği bu yenilemenin devamında eklenecek.
+
 ## 📋 Yapılacaklar
 
 ### Ses
-- [ ] **Arka plan müziği:** menü, oyun ve bekçi turu için ayrı parçalar, ses ayarı
+- [ ] **Fon müzikleri (sıradaki adım):** birkaç parça (menü, oyun, bekçi turu), Art Deco temasına uygun (caz/swing havası), ses ayarı
 - [ ] **Girişte "elf" ses efekti:** açılış ekranı için büyülü/elf temalı karşılama sesi
 
 ### Kartlar ve görseller
 - [ ] **Resimli kartlar:** her kart için illüstrasyon (şu an ikon var). Görsellerin kaynağı ve lisansı netleştirilecek.
 - [ ] **Kart ırkları/sınıfları:** Demon, Human, Elf, Oz (Oz ile ne kastedildiği netleştirilecek) ve diğerleri. Mevcut 4 sınıfla (Muhafız, Simyacı, Kor Büyücüsü, Kâhin) nasıl birleşeceğine karar verilecek: ırk mı olacak, sınıfların yerine mi geçecek?
-- [ ] **Ana oynanış ekranının grafik yenilemesi**
+- [x] ~~Ana oynanış ekranının grafik yenilemesi~~ → Art Deco stiline geçildi (yukarıda)
 
 ### Oyun tasarımı
 - [ ] **Balatro tarzı çarpan sisteminden çıkılacak.** Puan × Çarpan skoru, tılsımlar ve tur hedef skoru yeniden tasarlanacak. Neyin kalacağı (tüccar, altın, tılsımlar, bekçiler) karara bağlanacak.
@@ -47,7 +61,7 @@ Son güncelleme: 4 Kasım 2026
 ### iOS'a çıkış (Mac'te)
 - [ ] Godot iOS dışa aktarma şablonları, Apple Developer hesabı, Xcode ile cihazda deneme
 - [ ] Uygulama ikonu, açılış ekranı, App Store görselleri
-- [ ] Yazı tiplerini projeye gömmek (şu an sistem fontu, Cinzel / Alegreya Sans hedefleniyor)
+- [x] ~~Yazı tiplerini projeye gömmek~~ → Limelight, Poiret One, Josefin Sans eklendi
 
 ## ❓ Açık sorular
 - "Oz" ırkı ne olacak?

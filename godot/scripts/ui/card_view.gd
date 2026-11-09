@@ -1,8 +1,8 @@
 class_name CardView
 extends Control
-## Tek bir kartı (ya da tılsımı / güçlendirmeyi) çizer: nadirlik renginde çerçeve, sınıf renginde gövde,
-## oval resim penceresi, değer taşı, nadirlik taşı; tam boyda isim şeridi ve parşömen açıklama.
-## Üç katman: bu düğüm (çerçeve, gövde, resim penceresi) → ikon (TextureRect) → üst katman (sayı, taşlar, yazılar).
+## Art Deco kart: köşeleri kesik oniks gövde, nadirlik renginde dış çizgi + altın iç çizgi,
+## güneş ışınlı kemerli resim penceresi, elmas değer taşı, altın çizgili isim bandı ve fildişi açıklama.
+## Üç katman: bu düğüm (gövde, ışınlar, kemer) → ikon (TextureRect) → üst katman (sayı, taşlar, yazılar).
 
 signal pressed(view: CardView)
 
@@ -117,37 +117,45 @@ func _gem_text() -> String:
 
 func _gem_color() -> Color:
 	if locked:
-		return Color("77737d")
+		return Color("4a4752")
 	if charm_id != "":
-		return Color("3b2d55")
+		return Color("2b2140")
 	if not perk.is_empty():
-		return Color("d29a1c")
+		return Color("8a6a12")
 	var t := _t()
 	match t.kind:
 		"num":
 			var c := _color()
-			return Color("b766ff") if c == "rainbow" else Data.SUITS[c].gem
+			return Color("7d45c9") if c == "rainbow" else Data.SUITS[c].gem
 		"spell":
-			return Color("9a44d6")
+			return Color("6c2fa8")
 		"curse":
-			return Color("77737d")
-	return Color("2a7fbf")
+			return Color("4a4752")
+	return Color("1f5f99")
 
-## Kartın ölçüleri: gövde dikdörtgeni, resim merkezi ve yarıçapı
+## Kartın ölçüleri: gövde, kemer (resim penceresi) ve ikon merkezi
 func _geom() -> Dictionary:
 	var w := size.x
 	var h := size.y
-	var inset := w * 0.05
-	var body := Rect2(Vector2(inset, inset), size - Vector2(inset * 2, inset * 2))
-	var R := w * (0.38 if mini else 0.30)
-	var center := Vector2(w / 2, h * 0.5 if mini else body.position.y + w * 0.08 + R)
-	return {"w": w, "h": h, "body": body, "R": R, "center": center, "r": w * 0.09}
+	var body := Rect2(Vector2(w * 0.06, w * 0.06), size - Vector2(w * 0.12, w * 0.12))
+	var aw := w * (0.36 if mini else 0.31)              ## kemer yarı genişliği
+	var ah := w * (0.86 if mini else 0.66)              ## kemer yüksekliği
+	var top := (h - ah) / 2.0 if mini else body.position.y + w * 0.08
+	var arch_c := Vector2(w / 2, top + aw)              ## kemer yayının merkezi
+	var bottom := top + ah
+	var center := Vector2(w / 2, (top + bottom) / 2 + aw * 0.08)   ## ikon merkezi
+	return {"w": w, "h": h, "body": body, "aw": aw, "top": top, "bottom": bottom, "arch_c": arch_c,
+		"center": center, "R": aw * 0.92, "c": w * 0.09}
 
-static func _hex(center: Vector2, r: float) -> PackedVector2Array:
+func _arch(g: Dictionary, inset := 0.0) -> PackedVector2Array:
+	var aw: float = g.aw - inset
+	var ac: Vector2 = g.arch_c
 	var pts := PackedVector2Array()
-	for i in 6:
-		var a := deg_to_rad(60.0 * i - 90.0)
-		pts.append(center + Vector2(cos(a), sin(a)) * r)
+	for i in 17:
+		var a := PI + PI * i / 16.0
+		pts.append(ac + Vector2(cos(a), sin(a)) * aw)
+	pts.append(Vector2(ac.x + aw, g.bottom - inset))
+	pts.append(Vector2(ac.x - aw, g.bottom - inset))
 	return pts
 
 static func _text(ci: CanvasItem, font: Font, pos: Vector2, s: String, fsize: int, col: Color, width := -1.0, outline := 0) -> void:
@@ -155,67 +163,106 @@ static func _text(ci: CanvasItem, font: Font, pos: Vector2, s: String, fsize: in
 		ci.draw_string_outline(font, pos, s, HORIZONTAL_ALIGNMENT_CENTER, width, fsize, outline, UIKit.OUTLINE)
 	ci.draw_string(font, pos, s, HORIZONTAL_ALIGNMENT_CENTER, width, fsize, col)
 
-# Alt katman: parıltı, çerçeve, gövde, resim penceresi
+# Alt katman: parıltı, gövde, çizgiler, güneş ışınları, kemer, yelpazeler
 func _draw() -> void:
 	var g := _geom()
 	var w: float = g.w
-	var r: float = g.r
+	var c: float = g.c
 	var rc: Color = Data.RARITY[rarity()].color
 	var cc: Array = Data.CLASS_COLORS.get(_cls(), Data.CLASS_COLORS.neutral)
+	var full := Rect2(Vector2.ZERO, size)
+	var outer := DecoBox.oct(full, c)
 
+	# parıltı (seçili: altın, epik: kırmızı)
 	if selected or rarity() == "epic":
-		var glow := UIKit.box(Color(0, 0, 0, 0), int(r * 1.4))
-		glow.draw_center = false
-		glow.shadow_size = int(w * 0.16)
-		glow.shadow_color = (UIKit.GOLD_2 if selected else Color("ff3b3b")) * Color(1, 1, 1, 0.75)
-		glow.shadow_offset = Vector2.ZERO
-		glow.draw(get_canvas_item(), Rect2(Vector2.ZERO, size))
+		var gc := UIKit.GOLD_3 if selected else Color("ff3b3b")
+		draw_polyline(DecoBox.closed(DecoBox.oct(full.grow(4), c + 2)), Color(gc, 0.25), 8.0, true)
+		draw_polyline(DecoBox.closed(DecoBox.oct(full.grow(2), c + 1)), Color(gc, 0.9), 2.0, true)
 
-	UIKit.box(rc, int(r), maxi(1, int(w * 0.022)), rc.darkened(0.6), int(w * 0.07)).draw(get_canvas_item(), Rect2(Vector2.ZERO, size))
-	var hi := UIKit.box(Color(0, 0, 0, 0), int(r * 0.9), maxi(1, int(w * 0.012)), rc.lightened(0.55))
-	hi.draw_center = false
-	hi.draw(get_canvas_item(), Rect2(Vector2(w * 0.02, w * 0.02), size - Vector2(w * 0.04, w * 0.04)))
-
+	# gölge ve gövde
+	draw_colored_polygon(DecoBox.oct(Rect2(Vector2(1, 4), size), c), Color(0, 0, 0, 0.5))
+	draw_colored_polygon(outer, Color("0b0b0f").lerp(cc[1], 0.45))
 	var body: Rect2 = g.body
-	UIKit.box(cc[1], int(r * 0.7), 1, UIKit.OUTLINE).draw(get_canvas_item(), body)
-	var top := body.position + Vector2(r * 0.5, r * 0.5)
-	var gw := body.size.x - r
-	draw_polygon(PackedVector2Array([top, top + Vector2(gw, 0), top + Vector2(gw, body.size.y * 0.5), top + Vector2(0, body.size.y * 0.5)]),
-		PackedColorArray([cc[0], cc[0], Color(cc[1], 0), Color(cc[1], 0)]))
+	draw_colored_polygon(DecoBox.oct(body, c * 0.7), Color("101015").lerp(cc[1], 0.3))
 
-	var R: float = g.R
-	var center: Vector2 = g.center
-	draw_circle(center, R + w * 0.035, UIKit.OUTLINE)
-	draw_circle(center, R + w * 0.02, rc)
-	draw_circle(center, R, cc[1].darkened(0.25))
-	draw_circle(center, R * 0.9, cc[0].darkened(0.15))
-	draw_circle(center + Vector2(0, -R * 0.38), R * 0.5, Color(1, 1, 1, 0.1))
+	# güneş ışınları (kemerin arkasında, gövde içinde)
+	var ac: Vector2 = g.arch_c
+	var ray_len := w * 0.6
+	var n := 18
+	for i in n:
+		if i % 2 == 1:
+			continue
+		var a0 := PI + PI * i / n - 0.02
+		var a1 := PI + PI * (i + 1) / n + 0.02
+		var p0: Vector2 = _clamp_to(body, ac + Vector2(cos(a0), sin(a0)) * ray_len)
+		var p1: Vector2 = _clamp_to(body, ac + Vector2(cos(a1), sin(a1)) * ray_len)
+		draw_colored_polygon(PackedVector2Array([ac, p0, p1]), Color(rc, 0.13))
+
+	# çizgiler: dış (nadirlik rengi) + iç (altın)
+	draw_polyline(DecoBox.closed(outer), rc, maxf(1.5, w * 0.022), true)
+	draw_polyline(DecoBox.closed(DecoBox.oct(full.grow(-w * 0.035), c * 0.75)), Color(UIKit.GOLD_2, 0.85), 1.0, true)
+
+	# kemerli resim penceresi
+	var arch := _arch(g)
+	draw_colored_polygon(_arch(g, -w * 0.02), Color("050507"))
+	draw_colored_polygon(arch, cc[0].darkened(0.55))
+	draw_circle(g.center + Vector2(0, -g.aw * 0.2), g.aw * 0.55, Color(cc[0], 0.25))
+	draw_polyline(DecoBox.closed(arch), UIKit.GOLD_2, maxf(1.0, w * 0.014), true)
+	draw_polyline(DecoBox.closed(_arch(g, w * 0.03)), Color(rc, 0.7), 1.0, true)
+
+	if not mini:
+		# kemerin altında basamaklı süs
+		var by: float = g.bottom + w * 0.025
+		var cx := w / 2
+		var s := w * 0.045
+		draw_polyline(PackedVector2Array([Vector2(cx - s * 3, by + s), Vector2(cx - s * 2, by + s), Vector2(cx - s * 2, by), Vector2(cx - s, by),
+			Vector2(cx - s, by - s * 0.6), Vector2(cx + s, by - s * 0.6), Vector2(cx + s, by), Vector2(cx + s * 2, by), Vector2(cx + s * 2, by + s), Vector2(cx + s * 3, by + s)]),
+			Color(UIKit.GOLD_2, 0.7), 1.0, true)
+		# alt köşelerde yelpazeler
+		for k in 2:
+			var corner := Vector2(body.position.x + w * 0.01, body.end.y - w * 0.01) if k == 0 else Vector2(body.end.x - w * 0.01, body.end.y - w * 0.01)
+			var a_start := -PI / 2 if k == 0 else PI
+			for rr in [w * 0.06, w * 0.1, w * 0.14]:
+				draw_arc(corner, rr, a_start, a_start + PI / 2, 10, Color(UIKit.GOLD_2, 0.45), 1.0, true)
+
+	# efsanevi/epik: üstte yarım güneş arması
+	if rarity() in ["legendary", "epic"]:
+		var tc := Vector2(w / 2, 0)
+		draw_circle(tc, w * 0.13, Color("0b0b0f"))
+		for i in 9:
+			var a := PI + PI * (i + 0.5) / 9.0
+			draw_line(tc + Vector2(cos(a), sin(a)) * w * 0.05, tc + Vector2(cos(a), sin(a)) * w * 0.13, rc, 1.5, true)
+		draw_arc(tc, w * 0.13, PI, TAU, 16, rc, 1.5, true)
+		draw_circle(tc, w * 0.04, rc)
 	_sync_icon.call_deferred()
 	_over.queue_redraw()
 
-# Orta katman: resim penceresindeki ikon
+static func _clamp_to(r: Rect2, p: Vector2) -> Vector2:
+	return Vector2(clampf(p.x, r.position.x, r.end.x), clampf(p.y, r.position.y, r.end.y))
+
+# Orta katman: kemerdeki ikon
 func _sync_icon() -> void:
 	var g := _geom()
 	var R: float = g.R
 	var center: Vector2 = g.center
 	var t := _t()
 	var name := ""
-	var col := Color("fff6dc")
+	var col := UIKit.GOLD_3
 	var s := R * 1.15
 	if locked:
 		name = "lock"
 		s = R
-		col = Color(1, 1, 1, 0.7)
+		col = Color(1, 1, 1, 0.55)
 	elif charm_id != "":
 		name = Data.CHARM[charm_id].icon
-		col = Data.RARITY[rarity()].color.lightened(0.2)
+		col = Data.RARITY[rarity()].color.lightened(0.25)
 	elif not perk.is_empty():
 		name = perk.icon
 		s = R * 1.1
 	elif t.get("is_number", false):
 		name = "suit_" + _color()
 		col = Data.SUITS[_color()].color
-		s = R * 1.45
+		s = R * 1.5
 	elif not t.has("glyph"):
 		name = t.get("icon", "star")
 	_icon.visible = name != ""
@@ -225,64 +272,72 @@ func _sync_icon() -> void:
 		_icon.size = Vector2(s, s)
 		_icon.position = center - Vector2(s, s) / 2
 
-# Üst katman: sayı/simge yazısı, taşlar, isim şeridi, açıklama
+# Üst katman: sayı/simge yazısı, taşlar, isim bandı, açıklama
 func draw_overlay(ci: CanvasItem) -> void:
 	var g := _geom()
 	var w: float = g.w
-	var r: float = g.r
 	var R: float = g.R
 	var center: Vector2 = g.center
 	var body: Rect2 = g.body
 	var rc: Color = Data.RARITY[rarity()].color
 	var t := _t()
-	var light := Color("fff6dc")
 
 	if not locked and charm_id == "" and perk.is_empty():
 		if t.get("is_number", false):
-			var fs := int(R * 1.05)
+			var fs := int(R * 1.1)
 			_text(ci, UIKit.title_font(), Vector2(center.x - R, center.y + fs * 0.36), str(_value()), fs, Color.WHITE, R * 2, maxi(2, int(w * 0.05)))
 		elif t.has("glyph"):
-			var fs := int(R * (0.8 if t.glyph.length() > 2 else 0.95))
-			_text(ci, UIKit.title_font(), Vector2(center.x - R, center.y + fs * 0.36), t.glyph, fs, light, R * 2, maxi(2, int(w * 0.04)))
+			var fs := int(R * (0.8 if t.glyph.length() > 2 else 0.98))
+			_text(ci, UIKit.title_font(), Vector2(center.x - R, center.y + fs * 0.36), t.glyph, fs, UIKit.GOLD_3, R * 2, maxi(2, int(w * 0.04)))
 
-	# nadirlik taşı
-	var dg := w * 0.065
-	var dp := center + Vector2(0, R + w * 0.01)
-	ci.draw_colored_polygon(PackedVector2Array([dp + Vector2(0, -dg - 1.5), dp + Vector2(dg + 1.5, 0), dp + Vector2(0, dg + 1.5), dp + Vector2(-dg - 1.5, 0)]), UIKit.OUTLINE)
-	ci.draw_colored_polygon(PackedVector2Array([dp + Vector2(0, -dg), dp + Vector2(dg, 0), dp + Vector2(0, dg), dp + Vector2(-dg, 0)]), rc.lightened(0.15))
+	# nadirlik elması (kemerin dibinde)
+	var dp := Vector2(w / 2, g.bottom)
+	var dg := w * 0.05
+	ci.draw_colored_polygon(DecoBox.diamond(dp, dg + 1.5), UIKit.OUTLINE)
+	ci.draw_colored_polygon(DecoBox.diamond(dp, dg), rc)
+	ci.draw_colored_polygon(DecoBox.diamond(dp + Vector2(0, -dg * 0.3), dg * 0.35), Color(1, 1, 1, 0.45))
 
-	# değer taşı
-	var gc := Vector2(w * 0.11, w * 0.11)
-	var gr := w * 0.175
-	ci.draw_colored_polygon(_hex(gc, gr + 1.5), UIKit.OUTLINE)
-	ci.draw_colored_polygon(_hex(gc, gr), UIKit.GOLD_3)
-	ci.draw_colored_polygon(_hex(gc, gr * 0.8), _gem_color())
-	ci.draw_colored_polygon(_hex(gc + Vector2(-gr * 0.15, -gr * 0.2), gr * 0.35), Color(1, 1, 1, 0.18))
+	# değer elması (sol üst)
+	var gc := Vector2(w * 0.15, w * 0.15)
+	var gr := w * 0.16
+	ci.draw_colored_polygon(DecoBox.diamond(gc + Vector2(1, 2), gr + 2), Color(0, 0, 0, 0.6))
+	ci.draw_colored_polygon(DecoBox.diamond(gc, gr + 1.5), UIKit.OUTLINE)
+	ci.draw_colored_polygon(DecoBox.diamond(gc, gr), UIKit.GOLD_2)
+	ci.draw_colored_polygon(DecoBox.diamond(gc, gr * 0.78), _gem_color())
+	ci.draw_polyline(DecoBox.closed(DecoBox.diamond(gc, gr * 0.62)), Color(UIKit.GOLD_3, 0.5), 1.0, true)
 	var gt := _gem_text()
-	var gfs := int(gr * (0.95 if gt.length() <= 2 else 0.75))
-	_text(ci, UIKit.title_font(), Vector2(gc.x - gr, gc.y + gfs * 0.36), gt, gfs, Color.WHITE, gr * 2, 3)
+	var gfs := int(gr * (0.82 if gt.length() <= 2 else 0.6))
+	_text(ci, UIKit.title_font(), Vector2(gc.x - gr, gc.y + gfs * 0.38), gt, gfs, Color.WHITE, gr * 2, 3)
 
 	if boosted:
-		var bt := Rect2(Vector2(w * 0.68, -w * 0.05), Vector2(w * 0.36, w * 0.2))
-		UIKit.box(UIKit.GOLD_2, 4, 1, UIKit.OUTLINE).draw(ci.get_canvas_item(), bt)
-		_text(ci, UIKit.bold_font(), Vector2(bt.position.x, bt.position.y + bt.size.y * 0.75), "×2", int(w * 0.13), Color("3a2306"), bt.size.x)
+		var bt := Rect2(Vector2(w * 0.66, -w * 0.06), Vector2(w * 0.38, w * 0.2))
+		UIKit.box(UIKit.GOLD_2, 6, 1, UIKit.OUTLINE).draw(ci.get_canvas_item(), bt)
+		_text(ci, UIKit.title_font(), Vector2(bt.position.x, bt.position.y + bt.size.y * 0.76), "×2", int(w * 0.13), Color("120e05"), bt.size.x)
 
 	if not mini:
-		var ny := center.y + R + w * 0.1
-		var np := Rect2(Vector2(body.position.x - w * 0.01, ny), Vector2(body.size.x + w * 0.02, w * 0.15))
-		UIKit.box(Color("5a3a20"), 3, 1, UIKit.GOLD_1).draw(ci.get_canvas_item(), np)
-		var nfs := int(w * 0.085)
-		_text(ci, UIKit.title_font(), Vector2(np.position.x, np.position.y + np.size.y * 0.5 + nfs * 0.36), display_name(), nfs, Color("fff4d6"), np.size.x, 2)
+		# isim bandı
+		var ny: float = g.bottom + w * 0.1
+		var np := Rect2(Vector2(body.position.x, ny), Vector2(body.size.x, w * 0.15))
+		ci.draw_rect(np, Color("070709"))
+		ci.draw_line(np.position, Vector2(np.end.x, np.position.y), UIKit.GOLD_2, 1.0, true)
+		ci.draw_line(Vector2(np.position.x, np.end.y), np.end, UIKit.GOLD_2, 1.0, true)
+		ci.draw_colored_polygon(DecoBox.diamond(Vector2(np.position.x + w * 0.04, np.get_center().y), w * 0.025), UIKit.GOLD_2)
+		ci.draw_colored_polygon(DecoBox.diamond(Vector2(np.end.x - w * 0.04, np.get_center().y), w * 0.025), UIKit.GOLD_2)
+		var nfs := int(w * 0.072)
+		_text(ci, UIKit.caps_font(), Vector2(np.position.x + w * 0.07, np.position.y + np.size.y * 0.5 + nfs * 0.36), UIKit.upper(display_name()), nfs, UIKit.GOLD_3, np.size.x - w * 0.14)
+		# fildişi açıklama
 		var ty := np.end.y + w * 0.04
-		var tb := Rect2(Vector2(body.position.x + w * 0.04, ty), Vector2(body.size.x - w * 0.08, body.end.y - ty - w * 0.04))
+		var tb := Rect2(Vector2(body.position.x + w * 0.05, ty), Vector2(body.size.x - w * 0.1, body.end.y - ty - w * 0.05))
 		if tb.size.y > 8:
-			UIKit.box(UIKit.PARCH, int(w * 0.05)).draw(ci.get_canvas_item(), tb)
-			var tfs := int(w * 0.078)
+			var tp := DecoBox.oct(tb, w * 0.04)
+			ci.draw_colored_polygon(tp, UIKit.PARCH)
+			ci.draw_polyline(DecoBox.closed(tp), UIKit.GOLD_1, 1.0, true)
+			var tfs := int(w * 0.076)
 			var f := UIKit.bold_font()
-			var pad := w * 0.03
+			var pad := w * 0.035
 			var ts := f.get_multiline_string_size(description(), HORIZONTAL_ALIGNMENT_CENTER, tb.size.x - pad * 2, tfs)
 			var y0 := tb.position.y + maxf(pad, (tb.size.y - ts.y) / 2) + f.get_ascent(tfs)
 			ci.draw_multiline_string(f, Vector2(tb.position.x + pad, y0), description(), HORIZONTAL_ALIGNMENT_CENTER, tb.size.x - pad * 2, tfs, 5, UIKit.PARCH_INK)
 
 	if locked or dimmed:
-		UIKit.box(Color(0, 0, 0, 0.55), int(r)).draw(ci.get_canvas_item(), Rect2(Vector2.ZERO, size))
+		ci.draw_colored_polygon(DecoBox.oct(Rect2(Vector2.ZERO, size), g.c), Color(0, 0, 0, 0.6))

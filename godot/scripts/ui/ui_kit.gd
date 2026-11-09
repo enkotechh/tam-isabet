@@ -1,54 +1,84 @@
 class_name UIKit
 extends RefCounted
-## Ortak görünüm: renk paleti, yazı tipleri ve düğme/panel/etiket üreticileri (fantastik meyhane stili).
+## Ortak görünüm: Art Deco paleti (oniks siyahı, altın, fildişi), yazı tipleri
+## (Limelight, Poiret One, Josefin Sans — OFL) ve düğme/panel/etiket üreticileri.
 
-const WOOD_0 := Color("140c07")
-const WOOD_1 := Color("22160d")
-const WOOD_2 := Color("37241a")
-const WOOD_3 := Color("5d3d22")
-const GOLD_0 := Color("6e4a1a")
-const GOLD_1 := Color("b98a3a")
-const GOLD_2 := Color("e2b35a")
-const GOLD_3 := Color("ffe7a3")
-const PARCH := Color("e8d6ab")
-const PARCH_INK := Color("3a2814")
-const INK := Color("f3ead7")
-const MUTED := Color("c2b194")
-const HIT := Color("6be0a4")
-const MISS := Color("ff6b5b")
-const HEART := Color("ff4d6a")
-const CHIPS := Color("2f6fd6")
-const MULT := Color("d23b2f")
-const SPELL := Color("b77bff")
-const OUTLINE := Color("120a05")
+# Sabit adları eski sürümle aynı tutuldu; değerler Art Deco paletine göre.
+const WOOD_0 := Color("060608")    ## en koyu zemin
+const WOOD_1 := Color("0d0d12")    ## ana zemin (oniks)
+const WOOD_2 := Color("16161d")
+const WOOD_3 := Color("24242d")
+const GOLD_0 := Color("6b5420")    ## koyu altın
+const GOLD_1 := Color("a8862f")
+const GOLD_2 := Color("d4af37")    ## parlak altın
+const GOLD_3 := Color("f3dc93")    ## açık altın
+const PARCH := Color("efe6cf")     ## fildişi
+const PARCH_INK := Color("1a1712")
+const INK := Color("f1e9d2")
+const MUTED := Color("a89f86")
+const HIT := Color("4fd1a1")       ## yeşim
+const MISS := Color("e0564f")
+const HEART := Color("d9425a")
+const CHIPS := Color("1d3f73")     ## lacivert
+const MULT := Color("8e1f2c")      ## yakut
+const SPELL := Color("9d6bd8")
+const OUTLINE := Color("000000")
+
+const FONT_TITLE := "res://assets/fonts/Limelight-Regular.ttf"
+const FONT_DECO := "res://assets/fonts/PoiretOne-Regular.ttf"
+const FONT_BODY := "res://assets/fonts/JosefinSans.ttf"
 
 static var _title: Font
+static var _deco: Font
 static var _body: Font
 static var _bold: Font
+static var _caps: Font
 
+static func _font(path: String, fallback: Array, weight: int, wght := 0, spacing := 0) -> Font:
+	if ResourceLoader.exists(path):
+		var base: Font = load(path)
+		if wght == 0 and spacing == 0:
+			return base
+		var v := FontVariation.new()
+		v.base_font = base
+		if wght > 0:
+			v.variation_opentype = {TextServerManager.get_primary_interface().name_to_tag("wght"): wght}
+		if spacing != 0:
+			v.spacing_glyph = spacing
+		return v
+	var s := SystemFont.new()
+	s.font_names = PackedStringArray(fallback)
+	s.font_weight = weight
+	return s
+
+## Başlıklar ve düğmeler: Limelight
 static func title_font() -> Font:
 	if _title == null:
-		var f := SystemFont.new()
-		f.font_names = PackedStringArray(["Cinzel", "Trajan Pro", "Georgia", "Times New Roman", "serif"])
-		f.font_weight = 700
-		_title = f
+		_title = _font(FONT_TITLE, ["Georgia", "serif"], 700)
 	return _title
 
+## İnce süslü yazılar (alt başlık, slogan): Poiret One
+static func deco_font() -> Font:
+	if _deco == null:
+		_deco = _font(FONT_DECO, ["Georgia", "serif"], 400, 0, 1)
+	return _deco
+
+## Gövde metni: Josefin Sans
 static func body_font() -> Font:
 	if _body == null:
-		var f := SystemFont.new()
-		f.font_names = PackedStringArray(["Alegreya Sans", "Avenir Next", "Segoe UI", "Helvetica Neue", "Arial", "sans-serif"])
-		f.font_weight = 500
-		_body = f
+		_body = _font(FONT_BODY, ["Avenir Next", "Segoe UI", "Arial", "sans-serif"], 500, 500)
 	return _body
 
 static func bold_font() -> Font:
 	if _bold == null:
-		var f := SystemFont.new()
-		f.font_names = PackedStringArray(["Alegreya Sans", "Avenir Next", "Segoe UI", "Helvetica Neue", "Arial", "sans-serif"])
-		f.font_weight = 800
-		_bold = f
+		_bold = _font(FONT_BODY, ["Avenir Next", "Segoe UI", "Arial", "sans-serif"], 700, 700)
 	return _bold
+
+## Aralıklı büyük harf etiketleri
+static func caps_font() -> Font:
+	if _caps == null:
+		_caps = _font(FONT_BODY, ["Avenir Next", "Segoe UI", "Arial", "sans-serif"], 700, 700, 2)
+	return _caps
 
 static func make_theme() -> Theme:
 	var t := Theme.new()
@@ -59,22 +89,34 @@ static func make_theme() -> Theme:
 	t.set_font("bold_font", "RichTextLabel", bold_font())
 	return t
 
-static func box(bg: Color, radius := 12, border := 0, border_col := GOLD_0, shadow := 0) -> StyleBoxFlat:
-	var s := StyleBoxFlat.new()
+## Köşeleri kesik Art Deco kutu. radius, kesik köşe boyutuna çevrilir.
+static func box(bg: Color, radius := 12, border := 0, border_col := GOLD_0, shadow := 0) -> DecoBox:
+	var s := DecoBox.new()
 	s.bg_color = bg
-	s.set_corner_radius_all(radius)
-	if border > 0:
-		s.set_border_width_all(border)
-		s.border_color = border_col
-	if shadow > 0:
-		s.shadow_size = shadow
-		s.shadow_color = Color(0, 0, 0, 0.45)
-		s.shadow_offset = Vector2(0, 3)
+	s.chamfer = clampf(radius * 0.6, 0.0, 12.0)
+	s.border_width = float(border)
+	s.border_color = border_col
+	s.shadow_size = shadow
 	s.content_margin_left = 10
 	s.content_margin_right = 10
 	s.content_margin_top = 8
 	s.content_margin_bottom = 8
-	s.anti_aliasing = true
+	return s
+
+## Çift altın çizgili, köşe elmaslı süs kutusu (pencereler, arena)
+static func frame(bg := WOOD_1, line := GOLD_2, chamfer := 12.0, ornaments := true) -> DecoBox:
+	var s := DecoBox.new()
+	s.bg_color = bg
+	s.border_color = line
+	s.border_width = 1.5
+	s.inner_color = Color(line, 0.55)
+	s.inner_gap = 5.0
+	s.chamfer = chamfer
+	s.ornaments = ornaments
+	s.content_margin_left = 14
+	s.content_margin_right = 14
+	s.content_margin_top = 12
+	s.content_margin_bottom = 12
 	return s
 
 static func label(text: String, size := 16, color := INK, font: Font = null, align := HORIZONTAL_ALIGNMENT_LEFT) -> Label:
@@ -109,26 +151,32 @@ static func rich(bbcode: String, size := 15, color := INK) -> RichTextLabel:
 	r.text = bbcode
 	return r
 
-## Ahşap ya da altın plaket düğme
+## Art Deco düğme: siyah gövde + altın çift çizgi, ya da dolu altın
 static func button(text: String, gold := false, small := false) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
 	b.add_theme_font_override("font", title_font())
-	b.add_theme_font_size_override("font_size", 14 if small else 17)
-	var bg := Color("e2b35a") if gold else Color("4f331d")
-	var fc := Color("3a2306") if gold else INK
-	var normal := box(bg, 11 if small else 13, 2, GOLD_0, 5)
+	b.add_theme_font_size_override("font_size", 13 if small else 16)
+	var bg := GOLD_2 if gold else Color("111116")
+	var fc := Color("120e05") if gold else GOLD_3
+	var normal := frame(bg, GOLD_3 if gold else GOLD_2, 7.0 if small else 10.0, false)
+	normal.inner_color = Color(GOLD_0, 0.9) if gold else Color(GOLD_1, 0.6)
+	normal.inner_gap = 3.0 if small else 4.0
+	normal.shadow_size = 4
 	normal.content_margin_top = 8 if small else 13
-	normal.content_margin_bottom = 8 if small else 13
-	var hover := normal.duplicate()
+	normal.content_margin_bottom = 7 if small else 12
+	normal.content_margin_left = 10
+	normal.content_margin_right = 10
+	var hover: DecoBox = normal.duplicate()
 	hover.bg_color = bg.lightened(0.12)
-	var pressed := normal.duplicate()
-	pressed.bg_color = bg.darkened(0.12)
-	pressed.shadow_size = 1
-	var disabled := normal.duplicate()
-	disabled.bg_color = Color("3a3530")
-	disabled.border_color = Color("4a4038")
+	var pressed: DecoBox = normal.duplicate()
+	pressed.bg_color = bg.darkened(0.15)
+	pressed.shadow_size = 0
+	var disabled: DecoBox = normal.duplicate()
+	disabled.bg_color = Color("16161a")
+	disabled.border_color = Color("4a4538")
+	disabled.inner_color = Color(0, 0, 0, 0)
 	b.add_theme_stylebox_override("normal", normal)
 	b.add_theme_stylebox_override("hover", hover)
 	b.add_theme_stylebox_override("pressed", pressed)
@@ -137,14 +185,37 @@ static func button(text: String, gold := false, small := false) -> Button:
 	b.add_theme_color_override("font_color", fc)
 	b.add_theme_color_override("font_hover_color", fc)
 	b.add_theme_color_override("font_pressed_color", fc)
-	b.add_theme_color_override("font_disabled_color", Color("8a8070"))
+	b.add_theme_color_override("font_disabled_color", Color("6a6352"))
 	b.pressed.connect(func(): Sfx.play("click"))
 	return b
 
-static func panel(bg := Color(0, 0, 0, 0.38), radius := 14, border := 0, border_col := GOLD_0) -> PanelContainer:
+static func panel(bg := Color(0, 0, 0, 0.5), radius := 14, border := 0, border_col := GOLD_0) -> PanelContainer:
 	var p := PanelContainer.new()
 	p.add_theme_stylebox_override("panel", box(bg, radius, border, border_col))
 	return p
+
+## Ortası elmaslı yatay süs çizgisi
+static func divider(width := 220.0, color := GOLD_2) -> Control:
+	var d := DecoDivider.new()
+	d.custom_minimum_size = Vector2(width, 14)
+	d.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	d.color = color
+	d.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return d
+
+class DecoDivider extends Control:
+	var color := Color("d4af37")
+	func _draw() -> void:
+		var c := size / 2
+		var w := size.x
+		draw_line(Vector2(0, c.y - 2), Vector2(c.x - 12, c.y - 2), color, 1.0, true)
+		draw_line(Vector2(0, c.y + 2), Vector2(c.x - 12, c.y + 2), Color(color, 0.5), 1.0, true)
+		draw_line(Vector2(c.x + 12, c.y - 2), Vector2(w, c.y - 2), color, 1.0, true)
+		draw_line(Vector2(c.x + 12, c.y + 2), Vector2(w, c.y + 2), Color(color, 0.5), 1.0, true)
+		draw_colored_polygon(DecoBox.diamond(c, 6), color)
+		draw_colored_polygon(DecoBox.diamond(c, 2.5), Color("0d0d12"))
+		draw_colored_polygon(DecoBox.diamond(Vector2(c.x - 18, c.y), 2.5), color)
+		draw_colored_polygon(DecoBox.diamond(Vector2(c.x + 18, c.y), 2.5), color)
 
 static func vbox(sep := 10) -> VBoxContainer:
 	var v := VBoxContainer.new()
@@ -168,3 +239,7 @@ static func icon_rect(name: String, size := 24, color := INK) -> TextureRect:
 
 static func fmt_mult(m: float) -> String:
 	return RunState.fmt_mult(m)
+
+## Türkçe büyük harf: i → İ, ı → I (Godot'nun to_upper'ı dil bilmez)
+static func upper(s: String) -> String:
+	return s.replace("i", "İ").replace("ı", "I").to_upper()

@@ -88,7 +88,8 @@ godot/scripts/data/game_data.gd  autoload "Data": kartlar, tılsımlar, sınıfl
 godot/scripts/core/run_state.gd  RunState: bir oyunun tüm kuralları (arayüzden bağımsız, test edilebilir)
 godot/scripts/core/progress.gd   autoload "Progress": kilitler, başarımlar, rekor, ses tercihi (user://progress.json)
 godot/scripts/core/sfx.gd        autoload "Sfx": 22 ses efekti, dosyasız, açılışta kodla sentezlenir
-godot/scripts/ui/                arayüz: main.gd (ekranlar, pencereler, efektler), card_view.gd, hand_view.gd, ui_kit.gd
+godot/scripts/ui/                arayüz (Art Deco): main.gd, card_view.gd, hand_view.gd, ui_kit.gd, deco_box.gd
+godot/assets/fonts/              Limelight, Poiret One, Josefin Sans (OFL lisans dosyalarıyla)
 godot/assets/icons/              SVG ikonlar
 godot/tests/                     test_runner (kurallar + bot simülasyonu), shots (ekran görüntüsü turu)
 ```

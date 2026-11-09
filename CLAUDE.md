@@ -31,6 +31,13 @@ Kurallar:
 - Kartın içine `draw_texture_rect` ile ikon çizme: bazı sürücülerde kare çiziliyor. İkonlar TextureRect katmanında.
 - Yelpaze eldeki kartların `z_index` değeri var. Pencereler ve efektler daha yüksek `z_index` ile çiziliyor.
 
+Görsel stil: **Art Deco** (siyah + altın + fildişi).
+- Renkler ve yazı tipleri `ui_kit.gd`'de: `title_font()` Limelight, `deco_font()` Poiret One, `body_font()`/`bold_font()`/`caps_font()` Josefin Sans.
+- Kutular `DecoBox` ile çiziliyor (`scripts/ui/deco_box.gd`: köşeleri kesik, çift çizgi, köşe elmasları). Yeni panel için `UIKit.panel/box/frame`, düğme için `UIKit.button` kullan. StyleBoxFlat ve yuvarlak köşe kullanma.
+- Türkçe büyük harf için `to_upper()` değil `UIKit.upper()` kullan (i→İ, ı→I).
+- Label'larda `clip_text` kullanma: Josefin Sans'ın büyük harf işaretleri (Ö, Ğ) kırpılıyor. Taşan yazı için `text_overrun_behavior` kullan.
+- Nadirlik kartın dış çizgi renginden okunur (beyaz/mavi/mor/sarı/kırmızı). Bu kural korunmalı.
+
 ## Komutlar (proje kökünden)
 ```bash
 godot --headless --path godot --import

@@ -19,16 +19,42 @@ var toast_busy := false
 var ui := {}                 ## oyun ekranı öğeleri
 
 # ───────── Küçük çizim sınıfları ─────────
-class Planks extends Control:
+## Art Deco zemin: oniks, üstten yayılan güneş ışınları, altta yelpaze sırası,
+## kenarlarda ince altın çizgiler ve basamaklı köşeler
+class Backdrop extends Control:
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_RESIZED:
+			queue_redraw()
 	func _draw() -> void:
 		var w := size.x
-		var x := 0.0
-		var i := 0
-		while x < w:
-			draw_rect(Rect2(x, 0, 46, size.y), UIKit.WOOD_1 if i % 2 == 0 else Color("2a1b10"))
-			draw_rect(Rect2(x + 45, 0, 2, size.y), Color(0, 0, 0, 0.3))
-			x += 46
-			i += 1
+		var h := size.y
+		draw_rect(Rect2(Vector2.ZERO, size), UIKit.WOOD_1)
+		# güneş ışınları (üst orta)
+		var sc := Vector2(w / 2, -h * 0.02)
+		var n := 36
+		for i in n:
+			if i % 2 == 1:
+				continue
+			var a0 := PI * i / n
+			var a1 := PI * (i + 1) / n
+			var L := h * 1.1
+			draw_colored_polygon(PackedVector2Array([sc, sc + Vector2(cos(a0), sin(a0)) * L, sc + Vector2(cos(a1), sin(a1)) * L]), Color(UIKit.GOLD_2, 0.035))
+		for k in [h * 0.08, h * 0.13, h * 0.18]:
+			draw_arc(sc, k, 0, PI, 48, Color(UIKit.GOLD_2, 0.12), 1.0, true)
+		# alt yelpaze sırası
+		var fr := 26.0
+		var x := -fr
+		while x < w + fr:
+			for r in [fr, fr * 0.66, fr * 0.33]:
+				draw_arc(Vector2(x, h + 2), r, PI, TAU, 20, Color(UIKit.GOLD_2, 0.1), 1.0, true)
+			x += fr * 2
+		# kenar çizgileri ve basamaklı köşeler
+		var m := 6.0
+		var col := Color(UIKit.GOLD_2, 0.28)
+		draw_polyline(DecoBox.closed(DecoBox.oct(Rect2(Vector2(m, m), size - Vector2(m * 2, m * 2)), 14)), col, 1.0, true)
+		draw_polyline(DecoBox.closed(DecoBox.oct(Rect2(Vector2(m + 4, m + 4), size - Vector2(m * 2 + 8, m * 2 + 8)), 10)), Color(col, 0.14), 1.0, true)
+		for sx in [m + 10, w - m - 10]:
+			draw_line(Vector2(sx, h * 0.3), Vector2(sx, h * 0.7), Color(col, 0.12), 1.0, true)
 
 class Dial extends Control:
 	var progress := 0.0:
@@ -38,12 +64,19 @@ class Dial extends Control:
 	func _draw() -> void:
 		var c := size / 2
 		var r := minf(size.x, size.y) / 2 - 3
-		draw_circle(c, r + 3, UIKit.OUTLINE)
-		draw_circle(c, r, Color("0b1016"))
+		# dış sekizgen çerçeve + ışınlar
+		draw_colored_polygon(DecoBox.oct(Rect2(c - Vector2(r + 3, r + 3), Vector2(r + 3, r + 3) * 2), r * 0.42), Color("050507"))
+		draw_polyline(DecoBox.closed(DecoBox.oct(Rect2(c - Vector2(r + 3, r + 3), Vector2(r + 3, r + 3) * 2), r * 0.42)), UIKit.GOLD_2, 1.5, true)
+		for i in 24:
+			var a := TAU * i / 24.0
+			var inner := r - (9.0 if i % 3 == 0 else 5.0)
+			draw_line(c + Vector2(cos(a), sin(a)) * inner, c + Vector2(cos(a), sin(a)) * (r - 1), Color(UIKit.GOLD_2, 0.55), 1.0, true)
+		draw_arc(c, r - 12, 0, TAU, 64, Color(UIKit.GOLD_0, 0.9), 6, true)
 		if progress > 0:
-			draw_arc(c, r - 5, -PI / 2, -PI / 2 + TAU * clampf(progress, 0, 1), 64, UIKit.GOLD_2, 9, true)
-		draw_circle(c, r - 11, Color("26323f"))
-		draw_arc(c, r - 15, 0, TAU, 64, Color(1, 0.9, 0.64, 0.18), 1, true)
+			draw_arc(c, r - 12, -PI / 2, -PI / 2 + TAU * clampf(progress, 0, 1), 64, UIKit.GOLD_2, 6, true)
+		draw_circle(c, r - 17, Color("101015"))
+		draw_arc(c, r - 17, 0, TAU, 64, UIKit.GOLD_2, 1.0, true)
+		draw_arc(c, r - 21, 0, TAU, 64, Color(UIKit.GOLD_2, 0.35), 1.0, true)
 
 class Ring extends Control:
 	var col := Color.WHITE
@@ -60,35 +93,23 @@ class Bar extends Control:
 			value = v
 			queue_redraw()
 	func _draw() -> void:
-		UIKit.box(Color("0b1016"), 4, 1, UIKit.GOLD_0).draw(get_canvas_item(), Rect2(Vector2.ZERO, size))
+		draw_rect(Rect2(Vector2.ZERO, size), Color("050507"))
 		if value > 0:
-			UIKit.box(UIKit.GOLD_2, 4).draw(get_canvas_item(), Rect2(Vector2.ZERO, Vector2(size.x * clampf(value, 0, 1), size.y)))
+			var fw := size.x * clampf(value, 0, 1)
+			draw_rect(Rect2(Vector2(0, 1), Vector2(fw, size.y - 2)), UIKit.GOLD_2)
+			var x := 6.0
+			while x < fw:
+				draw_line(Vector2(x, 1), Vector2(x - 4, size.y - 1), Color(UIKit.GOLD_0, 0.6), 1.0)
+				x += 7.0
+		draw_rect(Rect2(Vector2.ZERO, size), UIKit.GOLD_1, false, 1.0)
 
 # ───────── Kurulum ─────────
 func _ready() -> void:
 	theme = UIKit.make_theme()
-	var bg := ColorRect.new()
-	bg.color = UIKit.WOOD_1
+	var bg := Backdrop.new()
 	_full(bg)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
-	var planks := Planks.new()
-	_full(planks)
-	planks.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(planks)
-	var glow := TextureRect.new()
-	var gt := GradientTexture2D.new()
-	gt.fill = GradientTexture2D.FILL_RADIAL
-	gt.fill_from = Vector2(0.5, 0.0)
-	gt.fill_to = Vector2(0.5, 0.75)
-	var gr := Gradient.new()
-	gr.set_color(0, Color(1, 0.66, 0.3, 0.22))
-	gr.set_color(1, Color(0, 0, 0, 0.45))
-	gt.gradient = gr
-	glow.texture = gt
-	glow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_full(glow)
-	add_child(glow)
 
 	content = Control.new()
 	_full(content)
@@ -197,14 +218,17 @@ func show_splash() -> void:
 		bob.tween_property(cv, "position:y", cv.position.y - 9, 2.2 + i * 0.2).set_trans(Tween.TRANS_SINE)
 		bob.tween_property(cv, "position:y", cv.position.y, 2.2 + i * 0.2).set_trans(Tween.TRANS_SINE)
 
-	var t1 := UIKit.title("T A M", 18, UIKit.GOLD_2)
-	t1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var t1 := UIKit.label("T  A  M", 20, UIKit.GOLD_2, UIKit.deco_font(), HORIZONTAL_ALIGNMENT_CENTER)
 	root.add_child(t1)
-	var t2 := UIKit.title("İsabet", 62, UIKit.GOLD_3)
+	root.add_child(UIKit.divider(200))
+	var t2 := UIKit.title("İSABET", 58, UIKit.GOLD_2)
 	t2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	t2.add_theme_constant_override("outline_size", 12)
+	t2.add_theme_constant_override("outline_size", 10)
+	t2.add_theme_color_override("font_shadow_color", Color(UIKit.GOLD_0, 0.9))
+	t2.add_theme_constant_override("shadow_offset_y", 4)
 	root.add_child(t2)
-	var tag := UIKit.label("Hedefi tuttur. Desteni kur. Kaderi yen.", 16, UIKit.MUTED, null, HORIZONTAL_ALIGNMENT_CENTER)
+	root.add_child(UIKit.divider(200))
+	var tag := UIKit.label("Hedefi tuttur · Desteni kur · Kaderi yen", 17, UIKit.GOLD_3, UIKit.deco_font(), HORIZONTAL_ALIGNMENT_CENTER)
 	root.add_child(tag)
 
 	var menu := UIKit.vbox(12)
@@ -264,7 +288,7 @@ func show_classes(head := "Sınıfını Seç") -> void:
 	screen = "classes"
 	var root := _screen_root()
 	var bar := UIKit.hbox(10)
-	var back := UIKit.button("‹", false, true)
+	var back := UIKit.button("<", false, true)
 	back.custom_minimum_size = Vector2(44, 40)
 	back.pressed.connect(show_splash)
 	bar.add_child(back)
@@ -349,7 +373,7 @@ func show_builder(cls: String) -> void:
 	var root := _screen_root()
 	root.add_theme_constant_override("separation", 8)
 	var bar := UIKit.hbox(10)
-	var back := UIKit.button("‹", false, true)
+	var back := UIKit.button("<", false, true)
 	back.custom_minimum_size = Vector2(44, 40)
 	back.pressed.connect(func(): show_classes("Koleksiyon ve Desteler"))
 	bar.add_child(back)
@@ -391,7 +415,7 @@ func show_builder(cls: String) -> void:
 	bui.flow = flow
 	scroll.add_child(flow)
 
-	var deckbar := UIKit.panel(Color("2a1a0e"), 16, 2, UIKit.GOLD_1)
+	var deckbar := UIKit.panel(Color("0b0b10"), 16, 2, UIKit.GOLD_2)
 	var dv := UIKit.vbox(8)
 	deckbar.add_child(dv)
 	var tg := Button.new()
@@ -603,7 +627,8 @@ func show_game() -> void:
 	root.add_child(cp)
 
 	# arena
-	var arena := UIKit.panel(Color("1d2833"), 22, 3, UIKit.GOLD_2)
+	var arena := PanelContainer.new()
+	arena.add_theme_stylebox_override("panel", UIKit.frame(Color("0a0a0e"), UIKit.GOLD_2, 16.0, true))
 	ui.arena = arena
 	var ah := UIKit.hbox(6)
 	arena.add_child(ah)
@@ -619,7 +644,7 @@ func show_game() -> void:
 	dv.alignment = BoxContainer.ALIGNMENT_CENTER
 	dv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dv.add_child(UIKit.label("HEDEF", 10, UIKit.MUTED, UIKit.title_font(), HORIZONTAL_ALIGNMENT_CENTER))
-	ui.target = UIKit.title("", 42, Color("fff6dc"))
+	ui.target = UIKit.title("", 34, UIKit.GOLD_3)
 	ui.target.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	dv.add_child(ui.target)
 	dial.add_child(dv)
@@ -640,7 +665,7 @@ func show_game() -> void:
 	var gv := UIKit.vbox(2)
 	gv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	ui.round_label = UIKit.label("", 11, UIKit.MUTED, UIKit.bold_font())
-	ui.round_label.clip_text = true
+	ui.round_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	gv.add_child(ui.round_label)
 	var gn := UIKit.hbox(6)
 	ui.rscore = UIKit.title("0", 26, UIKit.GOLD_3)
@@ -716,7 +741,7 @@ func show_game() -> void:
 	root.add_child(act)
 
 	var piles := UIKit.hbox(10)
-	ui.deck_icon = UIKit.panel(Color("4a2a1a"), 6, 2, UIKit.GOLD_1)
+	ui.deck_icon = UIKit.panel(Color("0b0b10"), 8, 2, UIKit.GOLD_2)
 	ui.deck_icon.custom_minimum_size = Vector2(34, 46)
 	piles.add_child(ui.deck_icon)
 	ui.draw_n = UIKit.label("", 13, UIKit.MUTED)
@@ -741,7 +766,7 @@ func show_game() -> void:
 	refresh()
 
 func _score_cell(caption: String, col: Color) -> PanelContainer:
-	var p := UIKit.panel(col, 10, 2, col.darkened(0.5))
+	var p := UIKit.panel(col, 10, 2, UIKit.GOLD_2)
 	p.custom_minimum_size = Vector2(64, 0)
 	var v := UIKit.vbox(0)
 	v.add_child(UIKit.label(caption, 9, Color(1, 1, 1, 0.85), UIKit.bold_font(), HORIZONTAL_ALIGNMENT_CENTER))
@@ -843,7 +868,7 @@ func refresh(show_modal := true) -> void:
 	var rl: String = "Öğretici" if (not run.tut.is_empty() and run.round == 1) else RunState.ROUND_TYPES[run.rtype]
 	if run.boss != "":
 		rl += ": " + Data.BOSSES[run.boss].name
-	ui.round_label.text = rl.to_upper()
+	ui.round_label.text = UIKit.upper(rl)
 	ui.round_label.add_theme_color_override("font_color", Color("ff8a7a") if run.boss != "" else UIKit.MUTED)
 	ui.goal.text = "/ %d" % run.goal
 	if not busy:
@@ -945,7 +970,7 @@ func refresh(show_modal := true) -> void:
 func _event_card(id: String, w: float) -> PanelContainer:
 	var ev: Dictionary = Data.EVENTS[id]
 	var col: Color = {"good": UIKit.HIT, "bad": UIKit.MISS}.get(ev.tone, UIKit.GOLD_2)
-	var p := UIKit.panel(Color("2b2346"), int(w * 0.15), 2, col)
+	var p := UIKit.panel(Color("0b0b10"), int(w * 0.2), 2, col)
 	p.custom_minimum_size = Vector2(w, w * 1.4)
 	p.add_child(UIKit.icon_rect(ev.icon, int(w * 0.55), col))
 	return p
@@ -1198,7 +1223,8 @@ func _show_sheet(m: Dictionary) -> void:
 	top_sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	col.add_child(top_sp)
 	var sheet := PanelContainer.new()
-	var ss := UIKit.box(Color("3a2616"), 20, 3, UIKit.GOLD_2, 18)
+	var ss := UIKit.frame(Color("0b0b10"), UIKit.GOLD_2, 16.0, true)
+	ss.shadow_size = 18
 	ss.content_margin_left = 16
 	ss.content_margin_right = 16
 	ss.content_margin_top = 18
@@ -1218,7 +1244,7 @@ func _show_sheet(m: Dictionary) -> void:
 	create_tween().tween_property(sheet, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
 func _eyebrow(v: VBoxContainer, text: String, head: String) -> void:
-	v.add_child(UIKit.label(text.to_upper(), 11, UIKit.GOLD_2, UIKit.bold_font()))
+	v.add_child(UIKit.label(UIKit.upper(text), 11, UIKit.GOLD_2, UIKit.caps_font()))
 	v.add_child(UIKit.wrap(UIKit.title(head, 25)))
 
 func _para(v: VBoxContainer, text: String, col := Color("e3d5b8")) -> void:
@@ -1436,7 +1462,7 @@ func _fill_shop(v: VBoxContainer) -> void:
 	var hv := UIKit.vbox(2)
 	hv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var nxt: String = ["small", "big", "boss"][run.round % 3]
-	hv.add_child(UIKit.label(("Kat %d · Sıradaki: %s" % [ceili((run.round + 1) / 3.0), RunState.ROUND_TYPES[nxt]]).to_upper(), 11, UIKit.GOLD_2, UIKit.bold_font()))
+	hv.add_child(UIKit.label(UIKit.upper("Kat %d · Sıradaki: %s" % [ceili((run.round + 1) / 3.0), RunState.ROUND_TYPES[nxt]]), 11, UIKit.GOLD_2, UIKit.caps_font()))
 	hv.add_child(UIKit.title("Tüccar", 25))
 	head.add_child(hv)
 	head.add_child(UIKit.icon_rect("coin", 26, Color("f5c518")))
@@ -1542,7 +1568,8 @@ func _render_coach() -> void:
 		return
 	for ch in coach.get_children():
 		ch.queue_free()
-	var ps := UIKit.box(UIKit.PARCH, 16, 2, UIKit.GOLD_1, 10)
+	var ps := UIKit.frame(UIKit.PARCH, UIKit.GOLD_1, 10.0, true)
+	ps.inner_color = Color(UIKit.GOLD_1, 0.5)
 	ps.content_margin_left = 14
 	ps.content_margin_right = 14
 	coach.add_theme_stylebox_override("panel", ps)
@@ -1639,7 +1666,7 @@ func _next_toast() -> void:
 			sub = "%s · %s" % [Data.RARITY[c.rarity].name, c.text]
 			pic = _card_view({"tid": t.id}, 34, true)
 	var p := PanelContainer.new()
-	var ps := UIKit.box(Color("17161c"), 40, 2, Color("f5c518") if t.kind == "ach" else Color(1, 1, 1, 0.25), 10)
+	var ps := UIKit.frame(Color("0b0b10"), UIKit.GOLD_2 if t.kind == "ach" else UIKit.GOLD_1, 12.0, t.kind == "ach")
 	ps.content_margin_left = 10
 	ps.content_margin_right = 16
 	p.add_theme_stylebox_override("panel", ps)
@@ -1652,7 +1679,7 @@ func _next_toast() -> void:
 	tv.add_child(UIKit.label(eyebrow, 10, Color("f5c518"), UIKit.bold_font()))
 	tv.add_child(UIKit.label(head, 16, Color.WHITE, UIKit.title_font()))
 	var sl := UIKit.label(sub, 12, Color("c9c4b8"))
-	sl.clip_text = true
+	sl.custom_minimum_size.x = 10
 	sl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	tv.add_child(sl)
 	h.add_child(tv)
