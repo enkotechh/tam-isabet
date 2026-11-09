@@ -65,6 +65,23 @@ func _ready() -> void:
 	main._builder_grid()
 	await wait(0.6)
 	shot("11_deste_notr")
+
+	# hikâye ara sahneleri: her görüntü türünden bir kare
+	var arts := {}
+	for ch in Data.STORY:
+		for sc in ch.scenes:
+			if not arts.has(sc.art):
+				arts[sc.art] = sc
+	var n := 12
+	for k in arts:
+		var cs := Cutscene.new()
+		cs.z_index = 200
+		main.add_child(cs)
+		cs.play([arts[k]], "Prolog" if k == "wheel" else "")
+		await wait(3.2)
+		shot("%02d_sahne_%s" % [n, k])
+		n += 1
+		cs.queue_free()
 	get_tree().quit()
 
 func wait(s: float) -> void:

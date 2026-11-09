@@ -1,27 +1,33 @@
 class_name UIKit
 extends RefCounted
-## Ortak görünüm: Art Deco paleti (oniks siyahı, altın, fildişi), yazı tipleri
+## Ortak görünüm: Dark Deco paleti (gece siyahı, eskimiş altın, bordo, sis grisi), yazı tipleri
 ## (Limelight, Poiret One, Josefin Sans — OFL) ve düğme/panel/etiket üreticileri.
 
-# Sabit adları eski sürümle aynı tutuldu; değerler Art Deco paletine göre.
-const WOOD_0 := Color("060608")    ## en koyu zemin
-const WOOD_1 := Color("0d0d12")    ## ana zemin (oniks)
-const WOOD_2 := Color("16161d")
-const WOOD_3 := Color("24242d")
-const GOLD_0 := Color("6b5420")    ## koyu altın
-const GOLD_1 := Color("a8862f")
-const GOLD_2 := Color("d4af37")    ## parlak altın
-const GOLD_3 := Color("f3dc93")    ## açık altın
-const PARCH := Color("efe6cf")     ## fildişi
+# Sabit adları eski sürümle aynı tutuldu; değerler Dark Deco paletine göre
+# (hikâye belgesi: siyah #07080C, altın #C9A24A, bordo #5A141C, sis grisi #3B4252).
+const WOOD_0 := Color("030407")    ## en koyu zemin
+const WOOD_1 := Color("07080c")    ## ana zemin (gece siyahı)
+const WOOD_2 := Color("0e1018")
+const WOOD_3 := Color("1b1e2a")
+const GOLD_0 := Color("5e4a1f")    ## koyu altın
+const GOLD_1 := Color("9a7b35")
+const GOLD_2 := Color("c9a24a")    ## eskimiş altın
+const GOLD_3 := Color("ecd49a")    ## açık altın
+const PARCH := Color("e6d9bb")     ## fildişi
 const PARCH_INK := Color("1a1712")
-const INK := Color("f1e9d2")
-const MUTED := Color("a89f86")
+const INK := Color("ece2c8")
+const MUTED := Color("9c978e")
 const HIT := Color("4fd1a1")       ## yeşim
 const MISS := Color("e0564f")
-const HEART := Color("d9425a")
-const CHIPS := Color("1d3f73")     ## lacivert
-const MULT := Color("8e1f2c")      ## yakut
+const HEART := Color("c8344a")
+const CHIPS := Color("2a3350")     ## gece mavisi
+const MULT := Color("6e1822")      ## bordo
 const SPELL := Color("9d6bd8")
+const BORDO := Color("5a141c")
+const FOG := Color("3b4252")       ## sis grisi
+const SKY_TOP := Color("120b22")   ## gece göğü (mor)
+const SKY_GLOW := Color("3a1226")  ## ufuktaki kızıl-mor ışık
+const WINDOW := Color("f2c46a")    ## ışıklı pencere
 const OUTLINE := Color("000000")
 
 const FONT_TITLE := "res://assets/fonts/Limelight-Regular.ttf"
@@ -158,7 +164,7 @@ static func button(text: String, gold := false, small := false) -> Button:
 	b.focus_mode = Control.FOCUS_NONE
 	b.add_theme_font_override("font", title_font())
 	b.add_theme_font_size_override("font_size", 13 if small else 16)
-	var bg := GOLD_2 if gold else Color("111116")
+	var bg := GOLD_2 if gold else WOOD_2
 	var fc := Color("120e05") if gold else GOLD_3
 	var normal := frame(bg, GOLD_3 if gold else GOLD_2, 7.0 if small else 10.0, false)
 	normal.inner_color = Color(GOLD_0, 0.9) if gold else Color(GOLD_1, 0.6)
@@ -174,7 +180,7 @@ static func button(text: String, gold := false, small := false) -> Button:
 	pressed.bg_color = bg.darkened(0.15)
 	pressed.shadow_size = 0
 	var disabled: DecoBox = normal.duplicate()
-	disabled.bg_color = Color("16161a")
+	disabled.bg_color = WOOD_1
 	disabled.border_color = Color("4a4538")
 	disabled.inner_color = Color(0, 0, 0, 0)
 	b.add_theme_stylebox_override("normal", normal)

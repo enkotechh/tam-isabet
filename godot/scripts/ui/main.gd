@@ -5,7 +5,7 @@ extends Control
 var run: RunState
 var screen := ""
 var busy := false
-var last_tap = null          ## son dokunulan kart uid'i ya da "c<i>" (tılsım)
+var last_tap = null          ## son dokunulan kart uid'i ya da "c<i>" (eşya)
 var last_target := -1
 
 var content: Control         ## ekranların kökü
@@ -17,44 +17,317 @@ var toasts: VBoxContainer
 var toast_queue: Array = []
 var toast_busy := false
 var ui := {}                 ## oyun ekranı öğeleri
+var backdrop: Backdrop
 
 # ───────── Küçük çizim sınıfları ─────────
-## Art Deco zemin: oniks, üstten yayılan güneş ışınları, altta yelpaze sırası,
-## kenarlarda ince altın çizgiler ve basamaklı köşeler
+## Dark Deco zemin: mor-kızıl gece göğü, yıldızlar ve ay, projektör ışıkları,
+## ışıklı pencereli gökdelen siluetleri, ince yağmur, kenarlarda altın çerçeve
 class Backdrop extends Control:
+	## "city": menü zemini · "table": oyun masası (oyuncunun gözünden)
+	var mode := "city":
+		set(v):
+			mode = v
+			queue_redraw()
+	var felt_font: Font
+
 	func _notification(what: int) -> void:
 		if what == NOTIFICATION_RESIZED:
 			queue_redraw()
+
+	## Dikey renk geçişi (üstten alta durak listesi: [oran, renk])
+	func _vgrad(stops: Array, h: float) -> void:
+		var w := size.x
+		for i in stops.size() - 1:
+			var a: Array = stops[i]
+			var b: Array = stops[i + 1]
+			var y0: float = h * float(a[0])
+			var y1: float = h * float(b[0])
+			var c0: Color = a[1]
+			var c1: Color = b[1]
+			draw_polygon(PackedVector2Array([Vector2(0, y0), Vector2(w, y0), Vector2(w, y1), Vector2(0, y1)]),
+				PackedColorArray([c0, c0, c1, c1]))
+
+	## Basamaklı (ziggurat) ya da iğne tepeli bir gökdelen çizer, pencerelerini yakar
+	func _tower(rng: RandomNumberGenerator, x: float, bw: float, bh: float, base: float, col: Color, lit: float, win_a: float) -> void:
+		var top := base - bh
+		var pts := PackedVector2Array()
+		var style := rng.randi() % 4
+		pts.append(Vector2(x, base))
+		if style == 0:
+			pts.append(Vector2(x, top))
+			pts.append(Vector2(x + bw, top))
+		elif style == 1 or style == 2:
+			# 2-3 basamak geri çekilme
+			var steps := 2 + rng.randi() % 2
+			var inset := bw * 0.14
+			var cx := x
+			var cy := top + bh * 0.16 * steps
+			var ex := x + bw
+			pts.append(Vector2(cx, cy))
+			var left := PackedVector2Array()
+			var right := PackedVector2Array()
+			for s in steps:
+				left.append(Vector2(cx, cy))
+				cx += inset
+				left.append(Vector2(cx, cy))
+				cy -= bh * 0.16
+				right.insert(0, Vector2(ex, cy + bh * 0.16))
+				ex -= inset
+				right.insert(0, Vector2(ex, cy + bh * 0.16))
+			pts.append_array(left)
+			pts.append(Vector2(cx, cy))
+			if style == 2:
+				var mid := (cx + ex) / 2
+				pts.append(Vector2(mid - 1.0, cy - bh * 0.12))
+				pts.append(Vector2(mid, cy - bh * 0.28))
+				pts.append(Vector2(mid + 1.0, cy - bh * 0.12))
+			pts.append(Vector2(ex, cy))
+			pts.append_array(right)
+		else:
+			# sivri iğne tepe
+			pts.append(Vector2(x, top + bh * 0.12))
+			pts.append(Vector2(x + bw * 0.5, top - bh * 0.18))
+			pts.append(Vector2(x + bw, top + bh * 0.12))
+		pts.append(Vector2(x + bw, base))
+		draw_colored_polygon(pts, col)
+		# pencereler
+		var wy := top + bh * 0.2
+		while wy < base - 6:
+			var wx := x + 3.0
+			while wx < x + bw - 4:
+				if rng.randf() < lit:
+					draw_rect(Rect2(Vector2(wx, wy), Vector2(2.0, 3.0)), Color(UIKit.WINDOW, win_a * rng.randf_range(0.5, 1.0)))
+				wx += 5.0
+			wy += 7.0
+
 	func _draw() -> void:
 		var w := size.x
-		var h := size.y
-		draw_rect(Rect2(Vector2.ZERO, size), UIKit.WOOD_1)
-		# güneş ışınları (üst orta)
-		var sc := Vector2(w / 2, -h * 0.02)
-		var n := 36
-		for i in n:
-			if i % 2 == 1:
-				continue
-			var a0 := PI * i / n
-			var a1 := PI * (i + 1) / n
-			var L := h * 1.1
-			draw_colored_polygon(PackedVector2Array([sc, sc + Vector2(cos(a0), sin(a0)) * L, sc + Vector2(cos(a1), sin(a1)) * L]), Color(UIKit.GOLD_2, 0.035))
-		for k in [h * 0.08, h * 0.13, h * 0.18]:
-			draw_arc(sc, k, 0, PI, 48, Color(UIKit.GOLD_2, 0.12), 1.0, true)
-		# alt yelpaze sırası
-		var fr := 26.0
-		var x := -fr
-		while x < w + fr:
-			for r in [fr, fr * 0.66, fr * 0.33]:
-				draw_arc(Vector2(x, h + 2), r, PI, TAU, 20, Color(UIKit.GOLD_2, 0.1), 1.0, true)
-			x += fr * 2
-		# kenar çizgileri ve basamaklı köşeler
+		# masa modunda şehir yalnızca üstteki pencerede görünür
+		var h := size.y if mode != "table" else size.y * 0.25
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 1929
+		# gece göğü: üstte mor, ufukta kızıl-bordo ışık, altta siyah
+		_vgrad([[0.0, UIKit.WOOD_1], [0.35, UIKit.SKY_TOP], [0.7, UIKit.SKY_GLOW], [0.86, Color("12070d")], [1.0, UIKit.WOOD_0]], h)
+		# yıldızlar
+		for i in 70:
+			var p := Vector2(rng.randf() * w, rng.randf() * h * 0.6)
+			draw_rect(Rect2(p, Vector2.ONE * rng.randf_range(0.8, 1.6)), Color(1, 0.95, 0.85, rng.randf_range(0.15, 0.55)))
+		# ay ve hâlesi
+		var moon := Vector2(w * 0.8, h * 0.13)
+		for k in 6:
+			draw_circle(moon, 16.0 + k * 9.0, Color(UIKit.GOLD_3, 0.025))
+		draw_circle(moon, 13.0, Color("efe3c4", 0.85))
+		draw_circle(moon + Vector2(4, -3), 11.0, Color("efe3c4", 0.25))
+		# projektör ışıkları (ufuktan göğe)
+		var horizon := h * 0.78
+		for b in [[0.22, -0.32], [0.3, 0.12], [0.64, -0.08], [0.74, 0.3]]:
+			var o := Vector2(w * float(b[0]), horizon)
+			var ang: float = -PI / 2 + float(b[1])
+			var L := h * 0.75
+			var d := Vector2(cos(ang), sin(ang))
+			var n := Vector2(-d.y, d.x)
+			draw_polygon(PackedVector2Array([o, o + d * L + n * 34.0, o + d * L - n * 34.0]),
+				PackedColorArray([Color(UIKit.GOLD_3, 0.10), Color(UIKit.GOLD_3, 0.0), Color(UIKit.GOLD_3, 0.0)]))
+		# uzak siluet (sisli)
+		var x := -10.0
+		while x < w:
+			var bw := rng.randf_range(18, 34)
+			_tower(rng, x, bw, h * rng.randf_range(0.12, 0.3), h, Color("150d1c"), 0.12, 0.45)
+			x += bw - rng.randf_range(0, 6)
+		# yakın siluet (simsiyah, daha çok ışık)
+		x = -14.0
+		while x < w:
+			var bw := rng.randf_range(26, 52)
+			_tower(rng, x, bw, h * rng.randf_range(0.07, 0.2), h, Color("050408"), 0.22, 0.9)
+			x += bw + rng.randf_range(-4, 2)
+		# ince yağmur
+		for i in 110:
+			var p := Vector2(rng.randf() * (w + 40) - 20, rng.randf() * h)
+			var l := rng.randf_range(8, 18)
+			draw_line(p, p + Vector2(-l * 0.18, l), Color(0.75, 0.78, 0.9, rng.randf_range(0.04, 0.1)), 1.0, true)
+		if mode == "table":
+			_draw_table()
+		# kenar çizgileri
 		var m := 6.0
-		var col := Color(UIKit.GOLD_2, 0.28)
+		var col := Color(UIKit.GOLD_2, 0.3)
 		draw_polyline(DecoBox.closed(DecoBox.oct(Rect2(Vector2(m, m), size - Vector2(m * 2, m * 2)), 14)), col, 1.0, true)
 		draw_polyline(DecoBox.closed(DecoBox.oct(Rect2(Vector2(m + 4, m + 4), size - Vector2(m * 2 + 8, m * 2 + 8)), 10)), Color(col, 0.14), 1.0, true)
-		for sx in [m + 10, w - m - 10]:
-			draw_line(Vector2(sx, h * 0.3), Vector2(sx, h * 0.7), Color(col, 0.12), 1.0, true)
+
+	## Kumar masası: uzak kenarı ekranın üst kısmında, yakın kenarı (deri kol dayama)
+	## altta kalan perspektifli çuha; ortada lamba ışığı ve masanın arması
+	func _draw_table() -> void:
+		var w := size.x
+		var h := size.y
+		var top := h * 0.2
+		# odanın karanlığı (pencerenin altı)
+		draw_rect(Rect2(0, h * 0.25, w, h), UIKit.WOOD_0)
+		draw_line(Vector2(0, h * 0.25), Vector2(w, h * 0.25), Color(UIKit.BORDO, 0.9), 3.0)
+		var far_l := w * 0.1
+		var far_r := w * 0.9
+		var near_l := -w * 0.35
+		var near_r := w * 1.35
+		var bot := h * 1.02
+		# masanın gövdesi (koyu ahşap kenar)
+		var rim := PackedVector2Array([Vector2(far_l - 10, top - 8), Vector2(far_r + 10, top - 8), Vector2(near_r + 30, bot), Vector2(near_l - 30, bot)])
+		draw_colored_polygon(rim, Color("1a0c0e"))
+		# çuha: uzakta koyu, ortada lamba altında açık yeşil
+		var felt_far := Color("0a1f19")
+		var felt_mid := Color("123a2d")
+		var felt_near := Color("0c261e")
+		var midy := top + (bot - top) * 0.45
+		var t_mid := (midy - top) / (bot - top)
+		var ml := lerpf(far_l, near_l, t_mid)
+		var mr := lerpf(far_r, near_r, t_mid)
+		draw_polygon(PackedVector2Array([Vector2(far_l, top), Vector2(far_r, top), Vector2(mr, midy), Vector2(ml, midy)]),
+			PackedColorArray([felt_far, felt_far, felt_mid, felt_mid]))
+		draw_polygon(PackedVector2Array([Vector2(ml, midy), Vector2(mr, midy), Vector2(near_r, bot), Vector2(near_l, bot)]),
+			PackedColorArray([felt_mid, felt_mid, felt_near, felt_near]))
+		# lamba ışığı havuzu
+		var lc := Vector2(w * 0.5, midy)
+		for k in 7:
+			var rr := w * (0.62 - k * 0.07)
+			_ellipse(lc, Vector2(rr, rr * 0.55), Color(1.0, 0.85, 0.55, 0.025))
+		# altın kenar şeridi
+		draw_line(Vector2(far_l, top), Vector2(far_r, top), Color(UIKit.GOLD_2, 0.7), 2.0, true)
+		draw_line(Vector2(far_l, top), Vector2(near_l, bot), Color(UIKit.GOLD_2, 0.45), 2.0, true)
+		draw_line(Vector2(far_r, top), Vector2(near_r, bot), Color(UIKit.GOLD_2, 0.45), 2.0, true)
+		var inset := 14.0
+		draw_line(Vector2(far_l + inset, top + 6), Vector2(far_r - inset, top + 6), Color(UIKit.GOLD_2, 0.2), 1.0, true)
+		# çuhadaki arma: sekizgen içinde sıfır ve kumarhanenin adı
+		var ac := Vector2(w * 0.5, top + (bot - top) * 0.36)
+		var ar := Vector2(w * 0.3, w * 0.13)
+		_ellipse_line(ac, ar, Color(UIKit.GOLD_2, 0.13), 1.5)
+		_ellipse_line(ac, ar * 0.9, Color(UIKit.GOLD_2, 0.08), 1.0)
+		if felt_font == null:
+			felt_font = UIKit.title_font()
+		var label := "THE GILDED ZERO"
+		var fs := 15
+		var tw := felt_font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		draw_string(felt_font, Vector2(ac.x - tw / 2, ac.y + fs * 0.35), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(UIKit.GOLD_2, 0.16))
+		# yakın kenar: bordo deri kol dayama ve altın biye
+		var ry := h * 0.885
+		draw_rect(Rect2(0, ry, w, h - ry), Color("2a0b10"))
+		draw_polygon(PackedVector2Array([Vector2(0, ry), Vector2(w, ry), Vector2(w, ry + 14), Vector2(0, ry + 14)]),
+			PackedColorArray([Color("4a141c"), Color("4a141c"), Color("2a0b10"), Color("2a0b10")]))
+		draw_line(Vector2(0, ry), Vector2(w, ry), Color(UIKit.GOLD_2, 0.75), 1.5, true)
+		draw_line(Vector2(0, ry + 3), Vector2(w, ry + 3), Color(UIKit.GOLD_2, 0.25), 1.0, true)
+		var x := 10.0
+		while x < w:
+			draw_circle(Vector2(x, ry + 9), 1.3, Color(UIKit.GOLD_1, 0.55))
+			x += 14.0
+		# kenarlarda karanlık (vinyet)
+		for k in 5:
+			var a := 0.08
+			draw_rect(Rect2(0, 0, 18 - k * 3, h), Color(0, 0, 0, a))
+			draw_rect(Rect2(w - 18 + k * 3, 0, 18 - k * 3, h), Color(0, 0, 0, a))
+
+	func _ellipse(c: Vector2, r: Vector2, col: Color) -> void:
+		var pts := PackedVector2Array()
+		for i in 40:
+			var a := TAU * i / 40.0
+			pts.append(c + Vector2(cos(a) * r.x, sin(a) * r.y))
+		draw_colored_polygon(pts, col)
+
+	func _ellipse_line(c: Vector2, r: Vector2, col: Color, width: float) -> void:
+		var pts := PackedVector2Array()
+		for i in 49:
+			var a := TAU * i / 48.0
+			pts.append(c + Vector2(cos(a) * r.x, sin(a) * r.y))
+		draw_polyline(pts, col, width, true)
+
+
+## Masadaki küçük ayrıntılar: kül tablasında yanan puro ve dumanı, viski kadehi, fiş kulesi.
+## Dokunmayı engellemez; konumlar oyun ekranı kurulunca ayarlanır.
+class TableProps extends Control:
+	var ashtray := Vector2(-999, -999)
+	var glass := Vector2(-999, -999)
+	var chips := Vector2(-999, -999)
+	var corner: Control      ## açıklama satırının sağında boş bırakılan köşe
+	var pile: Control        ## "Çekme" sayacı (fişler yanına konur)
+	var t := 0.0
+
+	func _process(delta: float) -> void:
+		t += delta
+		# konumlar her karede yerleşimden okunur (ekran boyu ve satır yükseklikleri değişebilir)
+		if is_instance_valid(corner):
+			var cr := corner.get_global_rect()
+			var o := get_global_rect().position
+			glass = cr.position - o + Vector2(20, cr.size.y + 2)
+			ashtray = cr.position - o + Vector2(cr.size.x - 40, cr.size.y + 4)
+		if is_instance_valid(pile):
+			var dr := pile.get_global_rect()
+			chips = dr.position - get_global_rect().position + Vector2(92, dr.size.y / 2 + 10)
+		queue_redraw()
+
+	func _ell(c: Vector2, r: Vector2, col: Color) -> void:
+		var pts := PackedVector2Array()
+		for i in 32:
+			var a := TAU * i / 32.0
+			pts.append(c + Vector2(cos(a) * r.x, sin(a) * r.y))
+		draw_colored_polygon(pts, col)
+
+	func _draw() -> void:
+		_draw_chips(chips)
+		_draw_glass(glass)
+		_draw_ashtray(ashtray)
+
+	func _draw_ashtray(p: Vector2) -> void:
+		# gölge, cam tabla
+		_ell(p + Vector2(3, 5), Vector2(26, 10), Color(0, 0, 0, 0.45))
+		_ell(p, Vector2(25, 10), Color("2b2a33"))
+		_ell(p + Vector2(0, -1), Vector2(19, 7), Color("111015"))
+		_ell(p + Vector2(-6, -3), Vector2(7, 2), Color(1, 1, 1, 0.08))
+		# puro: tablanın kenarına yaslanmış, ucu yanıyor
+		var a := p + Vector2(-2, -2)
+		var b := p + Vector2(30, -12)
+		draw_line(a, b, Color("4a2a17"), 5.0, true)
+		draw_line(a + Vector2(0, -1), b + Vector2(0, -1), Color("6e4224"), 1.5, true)
+		draw_line(a.lerp(b, 0.62), a.lerp(b, 0.7), Color(UIKit.BORDO.lightened(0.2)), 5.5, true)   # puro bandı
+		draw_line(a.lerp(b, 0.64), a.lerp(b, 0.68), Color(UIKit.GOLD_2), 5.5, true)
+		var glow := 0.65 + 0.35 * sin(t * 2.3) * sin(t * 0.7 + 1.0)
+		draw_circle(a, 6.0, Color(1.0, 0.45, 0.1, 0.15 * glow))
+		draw_circle(a, 3.2, Color(1.0, 0.4 + 0.2 * glow, 0.1, 0.9))
+		draw_circle(a + Vector2(-1, 0), 1.8, Color(1.0, 0.85, 0.5, glow))
+		# duman: yavaşça yükselip kıvrılan, sönen halkalar
+		for i in 9:
+			var k := fmod(t * 0.22 + i / 9.0, 1.0)
+			var y := -k * 120.0
+			var x := sin(k * 6.0 + t * 0.8 + i) * (4.0 + k * 16.0)
+			var r := 3.0 + k * 13.0
+			draw_circle(a + Vector2(x - 2, y - 4), r, Color(0.78, 0.76, 0.82, 0.10 * (1.0 - k) * minf(1.0, k * 6.0)))
+
+	func _draw_glass(p: Vector2) -> void:
+		_ell(p + Vector2(3, 3), Vector2(16, 6), Color(0, 0, 0, 0.45))
+		var w := 13.0
+		var h := 30.0
+		# viski
+		draw_colored_polygon(PackedVector2Array([p + Vector2(-w + 1, -h * 0.45), p + Vector2(w - 1, -h * 0.45), p + Vector2(w - 2, -2), p + Vector2(-w + 2, -2)]), Color(0.75, 0.38, 0.1, 0.75))
+		_ell(p + Vector2(0, -h * 0.45), Vector2(w - 1, 3.5), Color(0.95, 0.6, 0.25, 0.8))
+		# buz
+		draw_rect(Rect2(p + Vector2(-5, -h * 0.5), Vector2(7, 6)), Color(1, 1, 1, 0.25))
+		# cam ve kesme desen
+		draw_polyline(PackedVector2Array([p + Vector2(-w, -h), p + Vector2(-w + 2, 0), p + Vector2(w - 2, 0), p + Vector2(w, -h)]), Color(1, 1, 1, 0.45), 1.2, true)
+		_ell(p + Vector2(0, -h), Vector2(w, 3.5), Color(1, 1, 1, 0.06))
+		draw_arc(p + Vector2(0, -h), w, 0, PI, 16, Color(1, 1, 1, 0.35), 1.0, true)
+		for i in 3:
+			var yy := -h * (0.2 + i * 0.25)
+			draw_line(p + Vector2(-w + 2, yy), p + Vector2(0, yy - 5), Color(1, 1, 1, 0.12), 1.0, true)
+			draw_line(p + Vector2(0, yy - 5), p + Vector2(w - 2, yy), Color(1, 1, 1, 0.12), 1.0, true)
+		draw_line(p + Vector2(-w + 3, -h + 4), p + Vector2(-w + 4, -4), Color(1, 1, 1, 0.3), 1.5, true)
+
+	func _draw_chips(p: Vector2) -> void:
+		var cols := [UIKit.BORDO.lightened(0.15), Color("1d1d26"), UIKit.GOLD_1, UIKit.BORDO.lightened(0.15), Color("1d1d26")]
+		_ell(p + Vector2(3, 4), Vector2(16, 6), Color(0, 0, 0, 0.45))
+		for i in cols.size():
+			var c := p + Vector2(0, -i * 4.0)
+			var col: Color = cols[i]
+			draw_rect(Rect2(c + Vector2(-14, -4), Vector2(28, 4)), col.darkened(0.35))
+			_ell(c + Vector2(0, -4), Vector2(14, 5), col)
+			for j in 4:
+				var a := TAU * j / 4.0 + 0.4
+				draw_line(c + Vector2(cos(a) * 9, sin(a) * 3.2 - 4), c + Vector2(cos(a) * 13, sin(a) * 4.6 - 4), Color(1, 1, 1, 0.5), 1.5, true)
+		var top := p + Vector2(0, -(cols.size() - 1) * 4.0 - 4)
+		_ell(top, Vector2(7, 2.4), Color(UIKit.GOLD_3, 0.5))
 
 class Dial extends Control:
 	var progress := 0.0:
@@ -107,6 +380,7 @@ class Bar extends Control:
 func _ready() -> void:
 	theme = UIKit.make_theme()
 	var bg := Backdrop.new()
+	backdrop = bg
 	_full(bg)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
@@ -173,6 +447,7 @@ func _screen_root() -> VBoxContainer:
 	for ch in content.get_children():
 		ch.queue_free()
 	ui = {}
+	backdrop.mode = "city"
 	_close_ui_modal()
 	coach.visible = false
 	focus_frame.visible = false
@@ -190,6 +465,7 @@ func _screen_root() -> VBoxContainer:
 
 func _on_resize() -> void:
 	if screen == "game" and run:
+		_place_props()
 		refresh()
 
 # ───────── Açılış menüsü ─────────
@@ -218,58 +494,52 @@ func show_splash() -> void:
 		bob.tween_property(cv, "position:y", cv.position.y - 9, 2.2 + i * 0.2).set_trans(Tween.TRANS_SINE)
 		bob.tween_property(cv, "position:y", cv.position.y, 2.2 + i * 0.2).set_trans(Tween.TRANS_SINE)
 
-	var t1 := UIKit.label("T  A  M", 20, UIKit.GOLD_2, UIKit.deco_font(), HORIZONTAL_ALIGNMENT_CENTER)
+	var t1 := UIKit.label("P  O  R  T", 20, UIKit.GOLD_2, UIKit.deco_font(), HORIZONTAL_ALIGNMENT_CENTER)
 	root.add_child(t1)
 	root.add_child(UIKit.divider(200))
-	var t2 := UIKit.title("İSABET", 58, UIKit.GOLD_2)
+	var t2 := UIKit.title("HALLOWAY", 50, UIKit.GOLD_2)
 	t2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	t2.add_theme_constant_override("outline_size", 10)
 	t2.add_theme_color_override("font_shadow_color", Color(UIKit.GOLD_0, 0.9))
 	t2.add_theme_constant_override("shadow_offset_y", 4)
 	root.add_child(t2)
 	root.add_child(UIKit.divider(200))
-	var tag := UIKit.label("Hedefi tuttur · Desteni kur · Kaderi yen", 17, UIKit.GOLD_3, UIKit.deco_font(), HORIZONTAL_ALIGNMENT_CENTER)
+	var tag := UIKit.wrap(UIKit.label("Sıfırdan gelen adam, her şeyini sıfıra oynar.", 17, UIKit.GOLD_3, UIKit.deco_font(), HORIZONTAL_ALIGNMENT_CENTER))
 	root.add_child(tag)
 
+	# Ana menü: Devam Et (varsa), Hikâyeye Başla, Öğretici, Ayarlar
 	var menu := UIKit.vbox(12)
 	menu.custom_minimum_size.x = 300
 	menu.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	root.add_child(menu)
 	if run and run.lives > 0 and run.modal.get("type", "") != "over":
-		var cont := UIKit.button("Maceraya Devam Et", true)
+		var cont := UIKit.button("Devam Et", true)
 		cont.pressed.connect(func(): show_game())
 		menu.add_child(cont)
-	var start := UIKit.button("Maceraya Başla" if Progress.p.tutorial_done else "Öğreticiyle Başla", true)
-	start.pressed.connect(func():
-		if not Progress.p.tutorial_done:
-			start_run("guard", true)
-		else:
-			show_classes())
+	var start := UIKit.button("Hikâyeye Başla", true)
+	start.pressed.connect(start_story)
 	menu.add_child(start)
-	var coll := UIKit.button("Koleksiyon ve Desteler")
-	coll.pressed.connect(func(): show_classes("Koleksiyon ve Desteler"))
-	menu.add_child(coll)
-	var ach := UIKit.button("Başarımlar")
-	ach.pressed.connect(func(): open_modal({"type": "achievements"}))
-	menu.add_child(ach)
-	var row := UIKit.hbox(12)
-	var tb := UIKit.button("Öğretici", false, true)
-	tb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var tb := UIKit.button("Öğretici")
 	tb.pressed.connect(func(): start_run("guard", true))
-	var hb := UIKit.button("Nasıl Oynanır", false, true)
-	hb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hb.pressed.connect(func(): open_modal({"type": "howto"}))
-	row.add_child(tb)
-	row.add_child(hb)
+	menu.add_child(tb)
+	var st := UIKit.button("Ayarlar")
+	st.pressed.connect(func(): open_modal({"type": "settings"}))
+	menu.add_child(st)
+	var row := UIKit.hbox(12)
+	var coll := UIKit.button("Koleksiyon", false, true)
+	coll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	coll.pressed.connect(func(): show_classes("Koleksiyon ve Desteler"))
+	var ach := UIKit.button("Başarımlar", false, true)
+	ach.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ach.pressed.connect(func(): open_modal({"type": "achievements"}))
+	row.add_child(coll)
+	row.add_child(ach)
 	menu.add_child(row)
-	var snd := UIKit.button(_sound_label(), false, true)
-	snd.pressed.connect(func(): snd.text = _toggle_sound())
-	menu.add_child(snd)
 
 	var total := Data.UNLOCK_ORDER.size() + Data.NUMBER_CARDS.size()
-	var best := UIKit.label("REKOR  %d" % Progress.best, 14, UIKit.GOLD_3, UIKit.title_font(), HORIZONTAL_ALIGNMENT_CENTER)
+	var best := UIKit.label("REKOR  %d FİŞ" % Progress.best, 14, UIKit.GOLD_3, UIKit.title_font(), HORIZONTAL_ALIGNMENT_CENTER)
 	root.add_child(best)
-	root.add_child(UIKit.label("%d/%d kart ve tılsım açık · %d/%d başarım" % [Progress.p.unlocked.size(), total, Progress.p.ach.size(), Data.ACHIEVEMENTS.size()], 13, UIKit.MUTED, null, HORIZONTAL_ALIGNMENT_CENTER))
+	root.add_child(UIKit.label("%d/%d kart ve eşya açık · %d/%d başarım" % [Progress.p.unlocked.size(), total, Progress.p.ach.size(), Data.ACHIEVEMENTS.size()], 13, UIKit.MUTED, null, HORIZONTAL_ALIGNMENT_CENTER))
 	_render_coach()
 
 func _sound_label() -> String:
@@ -284,7 +554,7 @@ func _toggle_sound() -> String:
 	return _sound_label()
 
 # ───────── Sınıf seçimi ─────────
-func show_classes(head := "Sınıfını Seç") -> void:
+func show_classes(head := "Karakterini Seç") -> void:
 	screen = "classes"
 	var root := _screen_root()
 	var bar := UIKit.hbox(10)
@@ -331,6 +601,9 @@ func _class_panel(k: String) -> Control:
 	for a in Data.ACHIEVEMENTS:
 		if ("class:" + k) in a.unlocks:
 			lock_text = a.text
+	for i in Data.STORY.size():
+		if ("class:" + k) in Data.STORY[i].unlocks:
+			lock_text = "Hikâyede %d. bölümü bitir." % (i + 1)
 	hv.add_child(UIKit.wrap(UIKit.label(C.tagline if open else "Kilitli: " + lock_text, 14, Color("e8dcc2"))))
 	head.add_child(hv)
 	v.add_child(head)
@@ -347,7 +620,7 @@ func _class_panel(k: String) -> Control:
 	if open:
 		var n_open := Data.SPECIAL_CARDS.filter(func(c): return c.cls == k and Progress.is_unlocked(c.id)).size()
 		var n_all := Data.SPECIAL_CARDS.filter(func(c): return c.cls == k).size()
-		v.add_child(UIKit.label("Sınıf kartları: %d/%d açık" % [n_open, n_all], 12, UIKit.MUTED))
+		v.add_child(UIKit.label("Karakter kartları: %d/%d açık" % [n_open, n_all], 12, UIKit.MUTED))
 		var custom: bool = Progress.deck_for(k) != Data.RECOMMENDED[k]
 		v.add_child(UIKit.label("Kendi desteni kullanıyorsun." if custom else "Önerilen deste kullanılıyor.", 12, UIKit.MUTED))
 		var btns := UIKit.hbox(10)
@@ -415,7 +688,7 @@ func show_builder(cls: String) -> void:
 	bui.flow = flow
 	scroll.add_child(flow)
 
-	var deckbar := UIKit.panel(Color("0b0b10"), 16, 2, UIKit.GOLD_2)
+	var deckbar := UIKit.panel(Color(UIKit.WOOD_2, 0.94), 16, 2, UIKit.GOLD_2)
 	var dv := UIKit.vbox(8)
 	deckbar.add_child(dv)
 	var tg := Button.new()
@@ -585,19 +858,55 @@ func _builder_add(id: String, v: CardView) -> void:
 	_builder_update()
 
 # ───────── Oyun ─────────
-func start_run(cls: String, tutorial := false) -> void:
+## Hikâye modu: ilk seferde Prolog oynar, sonra Silas ile masaya oturulur
+## (ilk oyunda öğretici masa). Her kat hikâyenin bir bölümüdür.
+func start_story() -> void:
+	if not Progress.story_seen(1) and not Progress.story_finished():
+		Progress.mark_seen(1)
+		await play_scenes(Data.STORY[0].scenes, "Prolog")
+	start_run("guard", not Progress.p.tutorial_done, true)
+
+## Ara sahneyi her şeyin üstünde oynatır, bitince kaldırır
+func play_scenes(scenes: Array, title := "") -> void:
+	var cs := Cutscene.new()
+	cs.z_index = 115
+	add_child(cs)
+	Sfx.play("whoosh", 0.6)
+	await cs.play(scenes, title)
+	cs.queue_free()
+
+## Kural motorunun istediği hikâye sahnesi: bölüm açılışı ya da kapanışı
+func _story_scene(f: Dictionary) -> void:
+	var ch: int = f.ch
+	var C: Dictionary = Data.STORY[ch - 1]
+	if f.part == "intro":
+		await play_scenes(C.scenes, "Bölüm %d · %s" % [ch, C.title])
+		return
+	var last: Dictionary = C.scenes[C.scenes.size() - 1]
+	var scenes: Array = [{"art": last.art, "caption": "Bölüm %d tamamlandı" % ch, "text": C.outro}]
+	if ch == Data.STORY.size():
+		scenes.append({"art": "sedan", "caption": "Son", "text": "Vivienne bordo sedanla yağmura karıştı. Hikâye bitti, ama Port Halloway'de masalar hiç kapanmaz."})
+	await play_scenes(scenes, C.title)
+
+func start_run(cls: String, tutorial := false, story := false) -> void:
 	run = RunState.new()
 	run.rng.randomize()
-	run.start(cls, Progress.deck_for(cls), tutorial)
+	run.start(cls, Progress.deck_for(cls), tutorial, story)
 	last_target = -1
 	last_tap = null
 	show_game()
-	banner("Öğretici" if tutorial else Data.CLASSES[cls].name, "Adım adım öğren" if tutorial else "Macera başlıyor")
+	banner("Öğretici" if tutorial else Data.CLASSES[cls].name, "Adım adım öğren" if tutorial else "Masa açıldı")
 
 func show_game() -> void:
 	screen = "game"
 	var root := _screen_root()
 	root.add_theme_constant_override("separation", 8)
+	# oyuncunun gözünden kumar masası: zemin masa olur, üstüne puro, kadeh ve fişler
+	backdrop.mode = "table"
+	var props := TableProps.new()
+	_full(props)
+	props.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.props = props
 
 	# üst çubuk
 	var top := UIKit.hbox(8)
@@ -628,7 +937,7 @@ func show_game() -> void:
 
 	# arena
 	var arena := PanelContainer.new()
-	arena.add_theme_stylebox_override("panel", UIKit.frame(Color("0a0a0e"), UIKit.GOLD_2, 16.0, true))
+	arena.add_theme_stylebox_override("panel", UIKit.frame(Color(UIKit.WOOD_1, 0.78), UIKit.GOLD_2, 16.0, true))
 	ui.arena = arena
 	var ah := UIKit.hbox(6)
 	arena.add_child(ah)
@@ -655,7 +964,7 @@ func show_game() -> void:
 	ah.add_child(ui.omen)
 	root.add_child(arena)
 
-	# skor paneli: tur hedefi + Puan × Çarpan
+	# masa paneli: masa hedefi (net fiş) + Bahis × Oran
 	var sp := UIKit.panel(Color(0, 0, 0, 0.42), 16, 2, UIKit.GOLD_0)
 	ui.scorepanel = sp
 	var sv := UIKit.vbox(6)
@@ -680,8 +989,8 @@ func show_game() -> void:
 	srow.add_child(gv)
 	var sb := UIKit.hbox(4)
 	ui.scorebox = sb
-	ui.chips_box = _score_cell("PUAN", UIKit.CHIPS)
-	ui.mult_box = _score_cell("ÇARPAN", UIKit.MULT)
+	ui.chips_box = _score_cell("BAHİS", UIKit.CHIPS)
+	ui.mult_box = _score_cell("ORAN", UIKit.MULT)
 	sb.add_child(ui.chips_box)
 	var x := UIKit.title("×", 20, UIKit.GOLD_3)
 	x.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -694,6 +1003,25 @@ func show_game() -> void:
 	res.add_child(ui.plays)
 	res.add_child(ui.discs)
 	sv.add_child(res)
+	# bahis seçimi: masa minimumunun 1, 2 ve 4 katı
+	var brow := UIKit.hbox(8)
+	var bl := UIKit.label("BAHİS", 12, UIKit.GOLD_2, UIKit.caps_font())
+	bl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	brow.add_child(bl)
+	ui.bet_btns = []
+	for i in RunState.BET_STEPS.size():
+		var bb := UIKit.button("", i == 0, true)
+		bb.custom_minimum_size = Vector2(62, 32)
+		bb.pressed.connect(func():
+			if busy:
+				return
+			run.set_bet(i)
+			Sfx.play("chip", 0.8 + i * 0.15)
+			refresh())
+		brow.add_child(bb)
+		ui.bet_btns.append(bb)
+	sv.add_child(brow)
 	root.add_child(sp)
 
 	ui.mods = UIKit.rich("", 13)
@@ -713,9 +1041,17 @@ func show_game() -> void:
 	ph.add_child(ui.tot)
 	root.add_child(pv)
 
+	# açıklama satırı; sağ köşe masadaki kadeh ve kül tablası için boş bırakılır
+	var irow := UIKit.hbox(0)
 	ui.info = UIKit.rich("", 13, UIKit.MUTED)
 	ui.info.custom_minimum_size.y = 34
-	root.add_child(ui.info)
+	ui.info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	irow.add_child(ui.info)
+	var corner := Control.new()
+	corner.custom_minimum_size = Vector2(118, 0)
+	irow.add_child(corner)
+	ui.props_corner = corner
+	root.add_child(irow)
 
 	var hand := HandView.new()
 	hand.custom_minimum_size = Vector2(0, 170)
@@ -741,7 +1077,7 @@ func show_game() -> void:
 	root.add_child(act)
 
 	var piles := UIKit.hbox(10)
-	ui.deck_icon = UIKit.panel(Color("0b0b10"), 8, 2, UIKit.GOLD_2)
+	ui.deck_icon = UIKit.panel(Color(UIKit.WOOD_2, 0.94), 8, 2, UIKit.GOLD_2)
 	ui.deck_icon.custom_minimum_size = Vector2(34, 46)
 	piles.add_child(ui.deck_icon)
 	ui.draw_n = UIKit.label("", 13, UIKit.MUTED)
@@ -762,8 +1098,17 @@ func show_game() -> void:
 	piles.add_child(ui.deck_btn)
 	root.add_child(piles)
 
+	content.add_child(props)   # ekranın üstünde, eldeki kartların altında
 	await get_tree().process_frame
+	_place_props()
 	refresh()
+
+## Masadaki eşyaları elin iki yanına yerleştirir
+func _place_props() -> void:
+	if not ui.has("props") or not ui.has("hand"):
+		return
+	ui.props.corner = ui.props_corner
+	ui.props.pile = ui.draw_n
 
 func _score_cell(caption: String, col: Color) -> PanelContainer:
 	var p := UIKit.panel(col, 10, 2, UIKit.GOLD_2)
@@ -877,6 +1222,12 @@ func refresh(show_modal := true) -> void:
 		ui.dial.progress = ui.bar.value
 	ui.plays.text = "OYNAMA  %d" % run.plays
 	ui.discs.text = "DEĞİŞTİRME  %d" % run.discards
+	var opts: Array = run.bet_options()
+	for i in ui.bet_btns.size():
+		var bb: Button = ui.bet_btns[i]
+		bb.text = str(opts[i])
+		bb.modulate = Color(1, 1, 1, 1.0 if i == run.bet_level else 0.45)
+		bb.disabled = busy
 
 	# etkiler ve mesaj
 	var chips: Array = []
@@ -903,11 +1254,11 @@ func refresh(show_modal := true) -> void:
 		ui.tot.text = "0"
 		ui.tot.add_theme_color_override("font_color", UIKit.INK)
 	elif spell_only:
-		ui.expr.text = "Büyü: " + run.T(sc[0]).text
+		ui.expr.text = "Hamle: " + run.T(sc[0]).text
 		ui.tot.text = "✦"
 		pv_col = UIKit.SPELL
 	elif sc.any(run.is_spell):
-		ui.expr.text = "Büyü kartları tek başına kullanılır."
+		ui.expr.text = "Hamle kartları tek başına kullanılır."
 		ui.tot.text = "–"
 	else:
 		var r := run.evaluate(sc)
@@ -915,7 +1266,7 @@ func refresh(show_modal := true) -> void:
 			prev = run.score_play(sc, true)
 		var e: String = r.expr
 		if run.is_combo(sc):
-			e += "\nRenk serisi: +2 Çarpan"
+			e += "\nRenk serisi: +1 oran"
 		if r.tol > 0:
 			e += "\nTolerans ±%d" % r.tol
 		ui.expr.text = e
@@ -925,17 +1276,18 @@ func refresh(show_modal := true) -> void:
 			pv_col = UIKit.HIT
 	ui.preview.add_theme_stylebox_override("panel", UIKit.box(Color(0, 0, 0, 0.4), 14, 2, pv_col))
 	if not busy:
-		var show_sc: Dictionary = prev if not prev.is_empty() else run.last_score
-		_cell_val(ui.chips_box).text = str(show_sc.get("chips", 0))
-		_cell_val(ui.mult_box).text = RunState.fmt_mult(show_sc.get("mult", 0.0))
-		ui.scorebox.modulate.a = 0.7 if not prev.is_empty() else 1.0
+		# isabet önizlemesi varsa onun oranı, yoksa seçili kart sayısının temel oranı
+		_cell_val(ui.chips_box).text = str(run.bet())
+		var odds: float = prev.get("mult", 0.0) if not prev.is_empty() else (float(RunState.base_odds(sc.size())) if not sc.is_empty() and not sc.any(run.is_spell) else 0.0)
+		_cell_val(ui.mult_box).text = (RunState.fmt_mult(odds) + ":1") if odds > 0 else "–"
+		ui.scorebox.modulate.a = 1.0 if not prev.is_empty() else 0.75
 
 	# bilgi satırı
 	var info := "Kartlara dokunarak seç. Seçtiğin kartın açıklaması burada görünür."
 	if last_tap is String and int(last_tap.substr(1)) < run.charms.size():
 		var ch: Dictionary = run.charms[int(last_tap.substr(1))]
 		var d: Dictionary = Data.CHARM[ch.cid]
-		info = "[b][color=#ffe7a3]%s[/color][/b] [color=#%s]%s tılsım[/color]\n%s" % [d.name, Data.RARITY[d.rarity].color.to_html(false), Data.RARITY[d.rarity].name, d.text]
+		info = "[b][color=#ffe7a3]%s[/color][/b] [color=#%s]%s eşya[/color]\n%s" % [d.name, Data.RARITY[d.rarity].color.to_html(false), Data.RARITY[d.rarity].name, d.text]
 	else:
 		var ic = null
 		if last_tap is int:
@@ -970,7 +1322,7 @@ func refresh(show_modal := true) -> void:
 func _event_card(id: String, w: float) -> PanelContainer:
 	var ev: Dictionary = Data.EVENTS[id]
 	var col: Color = {"good": UIKit.HIT, "bad": UIKit.MISS}.get(ev.tone, UIKit.GOLD_2)
-	var p := UIKit.panel(Color("0b0b10"), int(w * 0.2), 2, col)
+	var p := UIKit.panel(Color(UIKit.WOOD_2, 0.94), int(w * 0.2), 2, col)
 	p.custom_minimum_size = Vector2(w, w * 1.4)
 	p.add_child(UIKit.icon_rect(ev.icon, int(w * 0.55), col))
 	return p
@@ -1040,26 +1392,37 @@ func _animate_play(views: Array, lp: Dictionary) -> void:
 	var by_uid := {}
 	for v in views:
 		by_uid[v.uid()] = v
-	# 1. kartlar sahneye (önizleme alanının üstüne) dizilir
+	# 1. kartlar elden masanın ortasına, çuhanın üstüne atılır: biraz yamuk,
+	# hafif üst üste, her biri "şap" diye yere oturur
 	var zone: Rect2 = ui.preview.get_global_rect()
 	var n := views.size()
-	var w := minf(62.0, (zone.size.x - 8 * (n - 1)) / maxf(1, n))
-	var total := n * w + (n - 1) * 8
-	Sfx.play("whoosh")
-	var tw := create_tween().set_parallel(true).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	var w := minf(76.0, (zone.size.x + 10 * (n - 1)) / maxf(1, n))
+	var step := w - 10.0
+	var total := (n - 1) * step + w
+	var cy := zone.get_center().y - 14
 	for i in n:
 		var v: CardView = views[i]
 		var s := w / v.size.x
-		var c := Vector2(zone.position.x + (zone.size.x - total) / 2 + i * (w + 8) + w / 2, zone.get_center().y - 10)
-		tw.tween_property(v, "global_position", c - v.size / 2, 0.32).set_delay(i * 0.04)
-		tw.tween_property(v, "rotation", 0.0, 0.32).set_delay(i * 0.04)
-		tw.tween_property(v, "scale", Vector2(s, s), 0.32).set_delay(i * 0.04)
-	await tw.finished
+		var c := Vector2(zone.get_center().x - total / 2 + i * step + w / 2, cy + randf_range(-6, 6))
+		var rot := randf_range(-0.14, 0.14)
+		v.z_index = 60 + i
+		var tw := create_tween().set_parallel(true).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(v, "global_position", c - v.size / 2, 0.22)
+		tw.tween_property(v, "rotation", rot, 0.22)
+		tw.tween_property(v, "scale", Vector2(s * 1.18, s * 1.18), 0.22)
+		Sfx.play("whoosh", 1.0 + i * 0.05)
+		await tw.finished
+		var land := create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		land.tween_property(v, "scale", Vector2(s, s), 0.12)
+		Sfx.play("chip", 0.7)
+	await get_tree().create_timer(0.12).timeout
 	var dial_c: Vector2 = ui.dial.get_global_rect().get_center()
 
 	if not lp.get("hit", false):
 		await get_tree().create_timer(0.25).timeout
 		floater("Iska", dial_c + Vector2(0, -60), UIKit.MISS)
+		if int(lp.get("bet", 0)) > 0:
+			floater("−%d fiş" % int(lp.bet), ui.scorebox.get_global_rect().get_center() + Vector2(0, -36), UIKit.MISS, 24)
 		Sfx.play("miss")
 		flash(Color(1, 0.2, 0.15, 0.35))
 		var t2 := create_tween().set_parallel(true).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
@@ -1073,7 +1436,7 @@ func _animate_play(views: Array, lp: Dictionary) -> void:
 			v.queue_free()
 		return
 
-	# 2. Puan × Çarpan adım adım sayılır
+	# 2. bahis ve oran adım adım kurulur
 	var sc: Dictionary = lp.score
 	var chips_l := _cell_val(ui.chips_box)
 	var mult_l := _cell_val(ui.mult_box)
@@ -1081,7 +1444,7 @@ func _animate_play(views: Array, lp: Dictionary) -> void:
 	var i := 0
 	for s in sc.steps:
 		chips_l.text = str(s.chips)
-		mult_l.text = RunState.fmt_mult(s.mult)
+		mult_l.text = RunState.fmt_mult(s.mult) + ":1"
 		pop(ui.chips_box if s.kind == "chips" else ui.mult_box, 1.25)
 		match s.kind:
 			"chips": Sfx.play("chip", 1.0 + i * 0.06)
@@ -1105,9 +1468,10 @@ func _animate_play(views: Array, lp: Dictionary) -> void:
 		i += 1
 		await get_tree().create_timer(maxf(0.14, 0.3 - i * 0.018)).timeout
 
-	# 3. toplam skor, kartlar hedefe uçar
+	# 3. kazanç, kartlar hedefe uçar
 	pop(ui.scorebox, 1.15)
-	floater(str(sc.total), ui.scorebox.get_global_rect().get_center() + Vector2(0, -36), Color.WHITE, 30)
+	floater("+%d fiş" % sc.total, ui.scorebox.get_global_rect().get_center() + Vector2(0, -36), Color.WHITE, 30)
+	Sfx.play("coin")
 	await get_tree().create_timer(0.3).timeout
 	var t3 := create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
 	for j in n:
@@ -1121,7 +1485,7 @@ func _animate_play(views: Array, lp: Dictionary) -> void:
 	Sfx.play("hit", 1.12 if sc.combo else 1.0)
 	ring(dial_c, Color("ffd25a") if sc.combo else UIKit.GOLD_3, 130)
 	burst(dial_c, [UIKit.GOLD_3, UIKit.GOLD_2, UIKit.HIT, Color("ff5a4b"), Color("4b8dff")], 110 if sc.combo else 60)
-	floater("Renk Serisi!" if sc.combo else "Tam İsabet!", dial_c + Vector2(0, -74), UIKit.GOLD_3, 28)
+	floater("Renk Serisi!" if sc.combo else "İsabet!", dial_c + Vector2(0, -74), UIKit.GOLD_3, 28)
 	shake(ui.arena)
 	ui.rscore.text = str(run.round_score)
 	pop(ui.rscore, 1.3)
@@ -1137,11 +1501,12 @@ func _play_fx() -> void:
 	var q := run.fx
 	run.fx = []
 	var vp := get_viewport_rect().size
+	var scenes: Array = []
 	for f in q:
 		match f.type:
 			"round":
 				Sfx.play("fanfare")
-				banner("Tur Geçildi", "%d / %d skor" % [run.round_score, run.goal])
+				banner("Masa Kazanıldı", "+%d / %d fiş" % [run.round_score, run.goal])
 				burst(vp * Vector2(0.5, 0.4), [UIKit.GOLD_3, UIKit.GOLD_2, UIKit.HIT, UIKit.SPELL, Color("4b8dff"), Color("ff5a4b")], 140, 600)
 			"boss":
 				Sfx.play("boss")
@@ -1175,6 +1540,13 @@ func _play_fx() -> void:
 					flash(Color(1, 0.3, 0.2, 0.3))
 			"buy":
 				Sfx.play("coin")
+			"loan":
+				Sfx.play("event_bad")
+				banner("Kasadan Borç", "+%d fiş · destene bir Senet girdi" % int(f.amount))
+			"scene":
+				scenes.append(f)
+	for f in scenes:
+		await _story_scene(f)
 
 # ───────── Pencereler ─────────
 func open_modal(m: Dictionary) -> void:
@@ -1223,7 +1595,7 @@ func _show_sheet(m: Dictionary) -> void:
 	top_sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	col.add_child(top_sp)
 	var sheet := PanelContainer.new()
-	var ss := UIKit.frame(Color("0b0b10"), UIKit.GOLD_2, 16.0, true)
+	var ss := UIKit.frame(Color(UIKit.WOOD_2, 0.94), UIKit.GOLD_2, 16.0, true)
 	ss.shadow_size = 18
 	ss.content_margin_left = 16
 	ss.content_margin_right = 16
@@ -1270,14 +1642,23 @@ func _fill_sheet(v: VBoxContainer, m: Dictionary) -> void:
 			_eyebrow(v, "Kurallar", "Nasıl Oynanır")
 			for line in [
 				"Elinden kart seç. Toplamları [b]hedefe tam eşit[/b] olsun ve [b]Oyna[/b]'ya bas.",
-				"Her isabet [b]Puan × Çarpan[/b] kadar skor verir. Puan: hedef + her kart için 5 + sayı kartlarının değeri. Çarpan: renk serisi ve tılsımlar.",
-				"Oynama hakların bitmeden [b]tur hedef skoruna[/b] ulaş. Ulaşamazsan 1 can gider. 2 canla başlarsın, en fazla 4 olur.",
-				"Her kat 3 turdur: Küçük Sınav, Büyük Sınav ve özel kurallı [b]Bekçi[/b].",
-				"Tur sonunda altın kazanırsın. [b]Tüccarda[/b] kart, tılsım ve güçlendirme alırsın. [b]Tılsımlar[/b] (en fazla 5) kalıcı bonus verir.",
+				"Her oynamadan önce [b]bahsini[/b] seç: masa minimumunun 1, 2 ya da 4 katı.",
+				"İsabette masa [b]bahis × oran[/b] kadar fiş öder. Oran kart sayısına bağlı: 1 kart 4:1, 2 kart 3:1, 3 kart 2:1, daha fazlası 1:1. Renk serisi ve eşyalar oranı artırır. Iskada bahsin gider.",
+				"Oynama hakların bitmeden masadan [b]hedef kadar net fiş[/b] kazan. Kazanamazsan 1 can gider. 2 canla başlarsın, en fazla 4 olur.",
+				"Fişin masa minimumunun altına düşerse kasa borç verir, ama destene bir [b]Senet[/b] girer.",
+				"Her kat 3 turdur: Küçük Masa, Büyük Masa ve özel kurallı [b]Engel[/b].",
+				"Fiş hem paran hem skorun. Tur sonunda ödül alırsın. [b]Tüccarda[/b] fişle kart, eşya ve güçlendirme alırsın. [b]Eşyalar[/b] (en fazla 5) kalıcı bonus verir.",
 				"Başta kartların çoğu [b]kilitlidir[/b]. Turları geçtikçe ve başarımlarla yenileri açılır.",
 				"Nadirlik: [color=#ece7db]beyaz[/color] Sıradan, [color=#4b8dff]mavi[/color] Nadir, [color=#b066ff]mor[/color] Ender, [color=#f5c518]sarı[/color] Efsanevi, [color=#ff3b3b]kırmızı[/color] Epik."]:
 				v.add_child(UIKit.rich("• " + line, 15, Color("e3d5b8")))
 			_btn(v, "Anladım", true, _close_ui_or_modal)
+		"settings":
+			_eyebrow(v, "Tercihler", "Ayarlar")
+			var snd := UIKit.button(_sound_label())
+			snd.pressed.connect(func(): snd.text = _toggle_sound())
+			v.add_child(snd)
+			_btn(v, "Nasıl Oynanır", false, func(): _show_sheet({"type": "howto"}))
+			_btn(v, "Kapat", true, _close_ui_or_modal)
 		"achievements":
 			_eyebrow(v, "%d/%d tamamlandı" % [Progress.p.ach.size(), Data.ACHIEVEMENTS.size()], "Başarımlar")
 			for a in Data.ACHIEVEMENTS:
@@ -1294,12 +1675,12 @@ func _fill_sheet(v: VBoxContainer, m: Dictionary) -> void:
 				tv.add_child(UIKit.wrap(UIKit.label(a.text, 13, Color("cfc2a6"))))
 				var rew: Array = []
 				for u in a.unlocks:
-					rew.append((Data.CLASSES[u.substr(6)].name + " sınıfı") if u.begins_with("class:") else (Data.CARD[u].name if Data.CARD.has(u) else Data.CHARM[u].name))
+					rew.append((Data.CLASSES[u.substr(6)].name + " karakteri") if u.begins_with("class:") else (Data.CARD[u].name if Data.CARD.has(u) else Data.CHARM[u].name))
 				tv.add_child(UIKit.wrap(UIKit.label("Ödül: " + ", ".join(PackedStringArray(rew)), 12, UIKit.MUTED)))
 				h.add_child(tv)
 				row.add_child(h)
 				v.add_child(row)
-			_para(v, "Ayrıca her geçtiğin tur, sıradaki kilitli kartı ya da tılsımı açar.", UIKit.MUTED)
+			_para(v, "Ayrıca her geçtiğin tur, sıradaki kilitli kartı ya da eşyayı açar.", UIKit.MUTED)
 			_btn(v, "Kapat", true, _close_ui_or_modal)
 		"event":
 			var ev: Dictionary = Data.EVENTS[m.id]
@@ -1316,7 +1697,7 @@ func _fill_sheet(v: VBoxContainer, m: Dictionary) -> void:
 				run.close_modal()
 				refresh())
 		"prophecy":
-			_eyebrow(v, "Kehanet", "Kaderi seç")
+			_eyebrow(v, "Sahne", "Olayı seç")
 			_para(v, "Sıradaki olay %s. Yerine hangisi gelsin?" % Data.EVENTS[run.next_event].name)
 			var row := UIKit.hbox(12)
 			row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -1337,7 +1718,7 @@ func _fill_sheet(v: VBoxContainer, m: Dictionary) -> void:
 				refresh()
 			_btn(v, "Vazgeç", false, on_cancel, true)
 		"cashout":
-			_eyebrow(v, "%s geçildi · %d/%d skor" % [RunState.ROUND_TYPES[run.rtype], run.round_score, run.goal], "Ganimet")
+			_eyebrow(v, "%s kazanıldı · +%d/%d fiş" % [RunState.ROUND_TYPES[run.rtype], run.round_score, run.goal], "Ganimet")
 			var box := UIKit.panel(Color(0, 0, 0, 0.3), 12)
 			var bv := UIKit.vbox(6)
 			for l in m.lines:
@@ -1362,7 +1743,7 @@ func _fill_sheet(v: VBoxContainer, m: Dictionary) -> void:
 		"shop":
 			_fill_shop(v)
 		"remove":
-			_eyebrow(v, "Desteni incelt · 3 altın", "Hangi kart gitsin?")
+			_eyebrow(v, "Desteni incelt · %d fiş" % run.remove_cost(), "Hangi kart gitsin?")
 			_para(v, "Destende %d kart var. Dokunduğun kart kalıcı olarak çıkar." % run.master.size())
 			var on_remove := func(c):
 				run.remove_card_paid(c.uid)
@@ -1386,16 +1767,16 @@ func _fill_sheet(v: VBoxContainer, m: Dictionary) -> void:
 				_para(v, "Tur hedefine ulaşamadın ama canın gitmedi. Tur %d yeni kartlarla baştan başlayacak." % run.round)
 			else:
 				_eyebrow(v, "Oynama hakkın bitti", "Bir can gitti")
-				_para(v, "%d skor hedefinin %d kadarına ulaştın. %d canın kaldı. Tur %d yeni kartlarla baştan başlayacak." % [run.goal, run.round_score, run.lives, run.round])
+				_para(v, "%d fişlik masa hedefinin %d kadarını kazandın. %d canın kaldı. Tur %d yeni kartlarla baştan başlayacak." % [run.goal, run.round_score, run.lives, run.round])
 			_btn(v, "Turu yeniden dene", true, func():
 				run.retry_round()
 				refresh())
 		"over":
 			_eyebrow(v, "Canın kalmadı", "Oyun bitti")
-			_para(v, "%s olarak %d. kattaki %d. tura kadar geldin. Toplam skor: %d. Rekor: %d." % [Data.CLASSES[run.cls].name, ceili(run.round / 3.0), run.round, run.score, Progress.best])
+			_para(v, "%s olarak %d. kattaki %d. tura kadar geldin. Toplam kazanç: %d fiş. Rekor: %d." % [Data.CLASSES[run.cls].name, ceili(run.round / 3.0), run.round, run.score, Progress.best])
 			_para(v, "Açtığın kartlar ve başarımlar kalıcı.", UIKit.MUTED)
 			var cls := run.cls
-			_btn(v, "Aynı sınıfla yeniden oyna", true, func(): start_run(cls))
+			_btn(v, "Aynı karakterle yeniden oyna", true, func(): start_run(cls))
 			_btn(v, "Ana menü", false, func():
 				run = null
 				show_splash())
@@ -1415,7 +1796,7 @@ func _fill_sheet(v: VBoxContainer, m: Dictionary) -> void:
 			_btn(v, "Yeni oyun başlat", false, func(): start_run(cls))
 
 func _close_ui_or_modal() -> void:
-	if screen == "game" and run and not run.modal.is_empty() and run.modal.type in ["howto", "achievements"]:
+	if screen == "game" and run and not run.modal.is_empty() and run.modal.type in ["howto", "achievements", "settings"]:
 		run.modal = {}
 		refresh()
 	elif screen == "game" and run and not run.modal.is_empty():
@@ -1443,7 +1824,7 @@ func _card_grid(cards: Array, cb: Callable, clickable: bool) -> Control:
 	return flow
 
 func _price_button(price: int, can: bool, cb: Callable, label := "") -> Button:
-	var b := UIKit.button(label if label != "" else "%d altın" % price, true, true)
+	var b := UIKit.button(label if label != "" else "%d fiş" % price, true, true)
 	b.add_theme_font_size_override("font_size", 13)
 	b.disabled = not can
 	b.pressed.connect(cb)
@@ -1485,7 +1866,7 @@ func _fill_shop(v: VBoxContainer) -> void:
 		row.add_child(_ware(cv, b))
 	v.add_child(row)
 
-	v.add_child(UIKit.label("TILSIMLAR · %d/%d YUVA" % [run.charms.size(), RunState.MAX_CHARMS], 13, UIKit.GOLD_2, UIKit.title_font()))
+	v.add_child(UIKit.label("EŞYALAR · %d/%d YUVA" % [run.charms.size(), RunState.MAX_CHARMS], 13, UIKit.GOLD_2, UIKit.title_font()))
 	var row2 := UIKit.hbox(10)
 	row2.alignment = BoxContainer.ALIGNMENT_CENTER
 	var full := run.charms.size() >= RunState.MAX_CHARMS
@@ -1517,7 +1898,7 @@ func _fill_shop(v: VBoxContainer) -> void:
 	v.add_child(row2)
 
 	if not run.charms.is_empty():
-		v.add_child(UIKit.label("TILSIMLARIN", 13, UIKit.GOLD_2, UIKit.title_font()))
+		v.add_child(UIKit.label("EŞYALARIN", 13, UIKit.GOLD_2, UIKit.title_font()))
 		var row3 := UIKit.hbox(8)
 		row3.alignment = BoxContainer.ALIGNMENT_CENTER
 		for i in run.charms.size():
@@ -1547,9 +1928,9 @@ func _fill_shop(v: VBoxContainer) -> void:
 	var on_rm := func():
 		run.modal = {"type": "remove"}
 		refresh()
-	var rm := _btn(br, "Kart çıkar · 3", false, on_rm, true)
+	var rm := _btn(br, "Kart çıkar · %d" % run.remove_cost(), false, on_rm, true)
 	rm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	rm.disabled = sh.removed or run.gold < 3 or run.master.size() <= 12
+	rm.disabled = sh.removed or run.gold < run.remove_cost() or run.master.size() <= 12
 	v.add_child(br)
 	_btn(v, "Sonraki tura geç", true, func():
 		run.next_round()
@@ -1643,7 +2024,7 @@ func _next_toast() -> void:
 			pic.add_child(UIKit.icon_rect(a.icon, 26, Color("3a2306")))
 		"class":
 			var C: Dictionary = Data.CLASSES[t.id]
-			eyebrow = "YENİ SINIF AÇILDI"
+			eyebrow = "YENİ KARAKTER AÇILDI"
 			head = C.name
 			sub = C.tagline
 			pic = UIKit.panel(Data.CLASS_COLORS[t.id][0], 23, 2, UIKit.GOLD_1)
@@ -1651,7 +2032,7 @@ func _next_toast() -> void:
 			pic.add_child(UIKit.icon_rect(C.icon, 26, Color.WHITE))
 		"charm":
 			var c: Dictionary = Data.CHARM[t.id]
-			eyebrow = "YENİ TILSIM AÇILDI"
+			eyebrow = "YENİ EŞYA AÇILDI"
 			head = c.name
 			sub = "%s · %s" % [Data.RARITY[c.rarity].name, c.text]
 			var cv := CardView.new()
@@ -1666,7 +2047,7 @@ func _next_toast() -> void:
 			sub = "%s · %s" % [Data.RARITY[c.rarity].name, c.text]
 			pic = _card_view({"tid": t.id}, 34, true)
 	var p := PanelContainer.new()
-	var ps := UIKit.frame(Color("0b0b10"), UIKit.GOLD_2 if t.kind == "ach" else UIKit.GOLD_1, 12.0, t.kind == "ach")
+	var ps := UIKit.frame(Color(UIKit.WOOD_2, 0.94), UIKit.GOLD_2 if t.kind == "ach" else UIKit.GOLD_1, 12.0, t.kind == "ach")
 	ps.content_margin_left = 10
 	ps.content_margin_right = 16
 	p.add_theme_stylebox_override("panel", ps)

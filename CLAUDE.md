@@ -1,6 +1,8 @@
-# Tam İsabet — Claude için proje notu
+# Port Halloway — Claude için proje notu
 
-Kartlarla hedef sayıya **tam** ulaşmaya dayalı, fantastik temalı roguelike bulmaca kart oyunu. Hedef platform **iOS**. Asıl geliştirme **Godot 4.7** sürümünde (`godot/`). Web sürümü (`index.html`, `js/`, `css/`) kuralların ilk prototipi ve referansı.
+Oyunun eski adı "Tam İsabet" (depo ve klasör adı hâlâ öyle). Hikâye: `docs/hikaye/kumar-babasi.pdf`, tasarım: `docs/tasarim/hikaye-modu.md`.
+
+Kartlarla hedef sayıya **tam** ulaşmaya dayalı, 1929 noir kumarhane temalı (Dark Deco) roguelike bulmaca kart oyunu. Hedef platform **iOS**. Asıl geliştirme **Godot 4.7** sürümünde (`godot/`). Web sürümü (`index.html`, `js/`, `css/`) kuralların ilk prototipi ve referansı.
 
 Durum ve yapılacaklar: **ROADMAP.md**. Yeni bir oturuma başlarken önce onu oku.
 
@@ -19,6 +21,7 @@ scripts/core/sfx.gd         autoload "Sfx": kodla sentezlenen ses efektleri
 scripts/ui/main.gd          ekranlar, pencereler, animasyonlar, öğretici balonu, bildirimler, deste oluşturucu
 scripts/ui/card_view.gd     kart çizimi (3 katman: çerçeve/gövde → ikon TextureRect → yazılar)
 scripts/ui/hand_view.gd     yelpaze el
+scripts/ui/cutscene.gd      hikâye ara sahneleri (altyazı, atla, kodla çizilen sahneler)
 scripts/ui/ui_kit.gd        renkler, yazı tipleri, düğme/panel üreticileri
 tests/test_runner.tscn      kural testleri + bot simülasyonu
 tests/shots.tscn            arayüz turu, ekran görüntüsü alır

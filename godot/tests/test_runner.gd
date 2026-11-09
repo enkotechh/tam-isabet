@@ -15,6 +15,7 @@ func _ready() -> void:
 	test_tutorial()
 	test_shop()
 	test_decks()
+	test_story()
 	test_sfx()
 	simulate()
 	print("\nSONUÇ: %d geçti, %d kaldı" % [passed, failed])
@@ -58,20 +59,57 @@ func test_evaluate() -> void:
 	check(not r.evaluate(cards(r, ["n-red-4", "n-blue-6"])).hit, "10 ≠ 11 ıska")
 	r.charms.append({"uid": 999, "cid": "nearshot", "state": {}})
 	check(r.evaluate(cards(r, ["n-red-4", "n-blue-6"])).hit, "yakın atış ±1")
-	check(RunState.goal_for(1) == 50 and RunState.goal_for(3) == 100, "tur hedefleri")
 
 func test_scoring() -> void:
-	print("Skor")
+	print("Bahis ve oran")
 	var r := make_run()
 	r.target = 10
+	check(r.gold == RunState.START_CHIPS and r.min_bet() == 3, "20 fişle başlar, 1. tur minimum bahis 3")
+	check(r.bet_options() == [3, 6, 12], "bahis seçenekleri 3/6/12")
 	var sc := r.score_play(cards(r, ["n-red-4", "n-blue-6"]))
-	check(sc.chips == 10 + 9 + 11 and sc.total == 30, "puan 10+(5+4)+(5+6)=30, çarpan 1")
+	check(sc.chips == 3 and is_equal_approx(sc.mult, 3.0) and sc.total == 9, "2 kart: 3 fiş × 3:1 = 9")
+	check(RunState.base_odds(1) == 4 and RunState.base_odds(3) == 2 and RunState.base_odds(6) == 1, "oran tablosu 4/3/2/1")
+	r.set_bet(2)
+	check(r.bet() == 12 and r.score_play(cards(r, ["n-red-4", "n-blue-6"])).total == 36, "yüksek bahis 12 × 3 = 36")
+	r.gold = 5
+	check(r.bet() == 5, "fiş yetmezse elindeki kadar yatırılır")
+	r.gold = 20
+	r.set_bet(0)
 	var combo := cards(r, ["n-red-1", "n-red-2", "n-red-3", "n-red-4"])
 	check(r.is_combo(combo), "aynı renk 4 kart = renk serisi")
 	r.charms.append({"uid": 998, "cid": "c_red", "state": {}})
 	r.charms.append({"uid": 997, "cid": "crown", "state": {}})
 	var sc2 := r.score_play(combo)
-	check(is_equal_approx(sc2.mult, (1 + 2 + 4) * 3.0), "çarpan (1+2 seri+4 kızıl) ×3 taç = 21")
+	check(is_equal_approx(sc2.mult, (1 + 1 + 1) * 3.0), "oran (1 + seri 1 + kızıl 1) × taç 3 = 9")
+	check(RunState.goal_for(1) == 12 and RunState.goal_for(3) == 40 and RunState.goal_for(6) == 72, "masa hedefleri 12/40/72")
+
+	# ıska bahsi götürür, isabet kazandırır
+	var r2 := make_run()
+	r2.set_bet(1)
+	var g0 := r2.gold
+	r2.target = 99
+	r2.hand = cards(r2, ["n-red-1"]) + r2.hand
+	r2.sel = [r2.hand[0].uid]
+	r2.play()
+	check(r2.gold == g0 - 6 and r2.round_score == -6, "ıska: 6 fişlik bahis gitti")
+	r2.modal = {}
+	r2.target = 9
+	r2.hand = cards(r2, ["n-blue-9"]) + r2.hand
+	r2.sel = [r2.hand[0].uid]
+	r2.play()
+	check(r2.last_play.score.total == 24 and r2.round_score == 18, "isabet: 6 × 4:1 = +24, masada net +18")
+	check(r2.modal.get("type", "") == "cashout" and r2.gold == g0 - 6 + 24 + 3 + 2 * 2, "hedef 12 aşıldı: masa ödülü 3 + kalan 2 oynama × 2")
+
+	# fiş bitince kasa borç verir, destene Senet girer
+	var r3 := make_run()
+	r3.gold = 1
+	var senet := r3.master.filter(func(c): return c.tid == "stone").size()
+	r3.target = 99
+	r3.hand = cards(r3, ["n-red-1"]) + r3.hand
+	r3.sel = [r3.hand[0].uid]
+	r3.play()
+	check(r3.loans == 1 and r3.master.filter(func(c): return c.tid == "stone").size() == senet + 1, "borç alındı, Senet girdi")
+	check(r3.gold == 1 + 9 - 3, "borç 9 fiş, ıskada 3 gitti")
 
 func test_tutorial() -> void:
 	print("Öğretici")
@@ -90,7 +128,7 @@ func test_tutorial() -> void:
 	r.toggle(one.call("n-blue-6"))
 	check(r.tut.step == 2, "seçim adımı geçti")
 	r.play()
-	check(r.tut.step == 3 and r.round_score == 30, "ilk isabet 30 skor")
+	check(r.tut.step == 3 and r.round_score == 9, "ilk isabet 3 × 3:1 = 9 fiş")
 	r.tut_advance()
 	r.sel = [r.hand[0].uid]
 	r.swap_cards()
@@ -134,6 +172,54 @@ func test_shop() -> void:
 	check(r.shop.reroll_cost == cost + 1, "yenileme ücreti arttı")
 	check(r.remove_card_paid(r.master[0].uid), "kart çıkarıldı")
 	check(not r.remove_card_paid(r.master[0].uid), "tüccar başına bir kez çıkarılır")
+
+func _clear_round(r: RunState) -> void:
+	r.round_score = r.goal
+	r._round_cleared()
+	r.next_round()
+
+func test_story() -> void:
+	print("Hikâye")
+	var saved: Dictionary = Progress.p
+	Progress.p = Progress.fresh()
+	check(Progress.story_done() == 0 and not Progress.class_open("seer"), "hikâye başta: 0 bölüm, Vivienne kilitli")
+	check(not Progress.class_open("alchemist"), "Eddie başta kilitli")
+	var r := RunState.new()
+	r.rng.seed = 7
+	r.start("guard", Data.RECOMMENDED.guard, false, true)
+	check(r.story_ch == 1, "ilk kat 1. bölüm")
+	check(r.fx.any(func(f): return f.type == "scene" and f.part == "intro" and f.ch == 1), "1. bölümün açılış sahnesi istendi")
+	check(Progress.story_seen(1), "açılış sahnesi izlendi sayıldı")
+	r.fx = []
+	_clear_round(r)
+	_clear_round(r)
+	check(r.rtype == "boss" and r.boss == Data.STORY[0].boss, "engel turu bölümün engeli")
+	r.fx = []
+	r.round_score = r.goal
+	r._round_cleared()
+	check(Progress.story_done() == 1, "3 tur kazanınca hikâye ilerledi")
+	check(r.fx.any(func(f): return f.type == "scene" and f.part == "outro" and f.ch == 1), "bölüm kapanış sahnesi istendi")
+	check(Progress.is_unlocked("fortify") and Progress.is_unlocked("discipline"), "1. bölüm kartları açıldı")
+	r.fx = []
+	r.next_round()
+	check(r.story_ch == 2 and r.fx.any(func(f): return f.type == "scene" and f.ch == 2), "sonraki kat 2. bölüm")
+	_clear_round(r)
+	_clear_round(r)
+	r.round_score = r.goal
+	r._round_cleared()
+	check(Progress.story_done() == 2 and Progress.class_open("seer"), "2. bölüm Vivienne'i açtı")
+	# kaybedip yeni oyuna başlayınca kalınan bölümden devam
+	var r2 := RunState.new()
+	r2.rng.seed = 8
+	r2.start("guard", Data.RECOMMENDED.guard, false, true)
+	check(r2.story_ch == 3, "yeni oyun kalınan bölümden (3) başlar")
+	check(not Progress.complete_chapter(5), "bölüm atlanamaz")
+	# serbest oyunda hikâye ilerlemez
+	var r3 := RunState.new()
+	r3.rng.seed = 9
+	r3.start("guard", Data.RECOMMENDED.guard)
+	check(r3.story_ch == 0 and not r3.fx.any(func(f): return f.type == "scene"), "serbest oyunda hikâye sahnesi yok")
+	Progress.p = saved
 
 func test_sfx() -> void:
 	print("Sesler")
@@ -191,12 +277,15 @@ func bot_game(r: RunState, strong: bool) -> int:
 				"cashout":
 					r.open_shop()
 				"shop":
+					# fiş aynı zamanda kasa: yedek bırakarak alışveriş
+					var keep := r.min_bet() * 6
 					for i in r.shop.charms.size():
-						r.buy("charm", i)
-					if r.gold >= 12:
+						if r.gold - r.charm_price(r.shop.charms[i].id) >= keep:
+							r.buy("charm", i)
+					if r.gold - r.price_of(RunState.PERKS[r.shop.perk.k].price) >= keep * 2:
 						r.buy("perk", 0)
 					for i in 3:
-						if r.gold >= 10 and not r.is_spell(r.shop.cards[i].c):
+						if r.gold - r.card_price(r.shop.cards[i].c) >= keep * 2 and not r.is_spell(r.shop.cards[i].c):
 							r.buy("card", i)
 					r.next_round()
 				_:
@@ -206,6 +295,8 @@ func bot_game(r: RunState, strong: bool) -> int:
 		if r.hand.is_empty():
 			check(false, "pencere yokken el boş")
 			return r.round
+		# güçlü bot hedefe yaklaşırken büyük oynar
+		r.set_bet(1 if strong and r.gold > r.min_bet() * 8 else 0)
 		if not r.power_used and r.rng.randf() < 0.3:
 			if r.cls == "pyro":
 				r.sel = [r.hand[0].uid]

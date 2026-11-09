@@ -23,6 +23,7 @@ func fresh() -> Dictionary:
 		"ach": [],
 		"stats": {"rounds": 0, "hits": 0, "spells": 0, "runs": 0, "best_round": 0},
 		"tutorial_done": false,
+		"story": {"done": 0, "seen": []},
 	}
 
 func load_data() -> void:
@@ -35,6 +36,8 @@ func load_data() -> void:
 		return
 	if typeof(d.get("progress")) == TYPE_DICTIONARY and int(d.progress.get("v", 0)) == 1:
 		p = d.progress
+		if typeof(p.get("story")) != TYPE_DICTIONARY:
+			p["story"] = {"done": 0, "seen": []}
 	best = int(d.get("best", 0))
 	if typeof(d.get("decks")) == TYPE_DICTIONARY:
 		decks = d.decks
@@ -99,6 +102,33 @@ func progress_unlock() -> void:
 		if not is_unlocked(u.id) and (u.cls == "neutral" or u.cls in p.classes):
 			unlock(u.id)
 			return
+
+# ───── Hikâye ilerlemesi ─────
+## Bitirilen bölüm sayısı (0–8)
+func story_done() -> int:
+	return int(p.story.get("done", 0))
+
+func story_finished() -> bool:
+	return story_done() >= Data.STORY.size()
+
+## Bölümün (1'den başlar) açılış sahneleri izlendi mi
+func story_seen(ch: int) -> bool:
+	return float(ch) in p.story.seen or ch in p.story.seen
+
+func mark_seen(ch: int) -> void:
+	if not story_seen(ch):
+		p.story.seen.append(ch)
+		save()
+
+## Sıradaki bölümü bitirir, ödüllerini açar. Bölüm sırası bozuksa false döner.
+func complete_chapter(ch: int) -> bool:
+	if ch != story_done() + 1 or ch > Data.STORY.size():
+		return false
+	p.story["done"] = ch
+	for u in Data.STORY[ch - 1].unlocks:
+		unlock(u)
+	save()
+	return true
 
 func submit_score(score: int) -> void:
 	if score > best:

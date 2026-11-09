@@ -1,11 +1,11 @@
 ; Engine configuration file.
-; Tam İsabet — Godot 4 sürümü (iOS hedefli, dikey ekran)
+; Port Halloway — Godot 4 sürümü (iOS hedefli, dikey ekran)
 
 config_version=5
 
 [application]
 
-config/name="Tam İsabet"
+config/name="Port Halloway"
 config/description="Kartlarla hedef sayıya tam ulaştığın roguelike bulmaca kart oyunu."
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")

@@ -1,4 +1,6 @@
-# Tam İsabet
+# Port Halloway
+
+(Eski adı: Tam İsabet)
 
 Kartlarla hedef sayıya tam ulaşmaya çalıştığın, fantastik temalı bir roguelike bulmaca kart oyunu.
 
