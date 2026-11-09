@@ -52,5 +52,10 @@ godot --path godot --resolution 390x844 res://tests/shots.tscn -- .shots
 - Windows'ta `godot` komutu PATH'te değilse winget kurulum yolundaki `Godot_v4.7.2-stable_win64_console.exe` kullanılır. Mac'te `/Applications/Godot.app/Contents/MacOS/Godot`.
 - Web sürümü: `python3 -m http.server 8766` (Windows: `powershell -ExecutionPolicy Bypass -File tools/serve.ps1`).
 
+## Blender (grafik aşaması)
+- Blender'a bağlantı `.mcp.json` içindeki `blender` sunucusuyla (BlenderMCP, `uvx blender-mcp`). Blender açık olmalı, eklentide "Connect" basılı olmalı.
+- Blender yönergeleri (arjun988/blender-skills, MIT) kullanıcı klasöründe: `~/.claude/skills/`. İş başında `blender-director` ile başla.
+- Render alınan görseller oyuna `godot/assets/` altına girer. Palet: siyah #07080C, altın #C9A24A, bordo #5A141C, sis grisi #3B4252.
+
 ## Git
 - Depo: https://github.com/enkotechh/tam-isabet (dal: `main`). Değişiklikleri anlamlı Türkçe commit mesajlarıyla gönder.

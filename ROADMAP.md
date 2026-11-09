@@ -5,7 +5,7 @@
 Son güncelleme: 9 Kasım 2026
 
 ## 📍 Kaldığımız yer
-- **Asıl sürüm:** `godot/` (Godot 4.7, iOS hedefli). Oynanabilir, 47 testin hepsi geçiyor. Görünüm Dark Deco'ya geçiyor.
+- **Asıl sürüm:** `godot/` (Godot 4.7, iOS hedefli). Oynanabilir, 71 testin hepsi geçiyor. Görünüm Dark Deco'ya geçiyor.
 - **Oyunun adı:** **Port Halloway** (9 Kasım 2026). "Tam İsabet" adı tamamen bırakıldı.
 - **Yapıldı (9 Kasım 2026):**
   - ana menü: Devam Et, Hikâyeye Başla, Öğretici, Ayarlar
@@ -28,16 +28,12 @@ Son güncelleme: 9 Kasım 2026
     - isabet bahis × oran öder (1 kart 4:1 … 4+ kart 1:1), ıskada bahis gider
     - fiş biterse kasa borç verir, destene Senet girer
   - 71 test geçiyor
-- **Sıradaki iş:** grafiklerden önce kalkacak/eklenecek/değişecek şeyler. Grafikler (kartlar, ikonlar, ara sahne çizimleri) en sonda topluca gözden geçirilecek. Ardından:
-  - kartların Dark Deco çizimi ve temaya uygun ikonlar
-  - dark noir caz fon müzikleri
-  - atmosfere uygun açılış sesi Ardından dark noir caz fon müzikleri ve atmosfere uygun açılış sesi.
+- **Sıradaki iş:** grafiklerden önce kalkacak/eklenecek/değişecek şeyler (aşağıda "Yapılacaklar"). Grafikler (kartlar, ikonlar, ara sahne çizimleri, masa) en sonda topluca, Blender ile yapılacak.
+- **Blender:** yönergeler `~/.claude/skills` içinde, bağlantı `.mcp.json` içinde. Blender, uv ve BlenderMCP eklentisinin kurulması bekleniyor.
 - **Yeni yön (9 Kasım 2026):** oyun, "Kumar Babası" hikâyesinin dünyasına taşınıyor: 1929, hayali liman şehri Port Halloway, gizli kumarhane The Gilded Zero. Hikâye: `docs/hikaye/kumar-babasi.pdf`. Görsel örnekler: `docs/referans/`.
 - **Bekleyen büyük kararlar** (aşağıda "Açık sorular"):
-  - ırkların/sınıfların hikâyeye göre yeniden belirlenmesi
-  - hikâye modunun oynanışa nasıl bağlanacağı
+  - Black Market ve DLC içerikleri
   - kart illüstrasyonları
-  - DLC ve Black Market
 - **Çalışma düzeni:**
   - Windows bilgisayarda Godot, git ve GitHub CLI kurulu. GitHub hesabı `enkotechh`, depo herkese açık.
   - Mac'e geçince `git clone` ile devam edilecek. iOS'a çıkış Mac'te yapılacak.
@@ -83,7 +79,7 @@ Son güncelleme: 9 Kasım 2026
 ## 📋 Yapılacaklar
 
 ### Görsel stil
-- [ ] **Dark Deco'ya geçiş (ilk iş):** mevcut Art Deco görünümü noir bir Dark Deco havasına çevrilecek. Örnek resimler `docs/referans/` klasöründe.
+- [ ] **Dark Deco'ya geçiş:** palet, gece şehri zemini ve POV masa yapıldı; kartlar, paneller ve ikonlar grafik aşamasında. Mevcut Art Deco görünümü noir bir Dark Deco havasına çevrilecek. Örnek resimler `docs/referans/` klasöründe.
   - **Palet (hikâye belgesinden):** siyah `#07080C`, altın `#C9A24A`, bordo `#5A141C`, sis grisi `#3B4252`. Kırmızı çok az, yalnızca vurgu olarak kullanılacak.
   - **Örneklerden gelen hava:** gece şehri, ışıklı pencereli gökdelen siluetleri, mor/kızıl gökyüzü, bordo kadife, sıcak lamba ışığı, panjurdan sızan çizgili ışık, yüzler yarı gölgede.
   - **Dokular:** hafif film greni, yağmur, titreyen ışık.
@@ -91,7 +87,9 @@ Son güncelleme: 9 Kasım 2026
   - **Değişecekler:** zemin, kartlar, paneller. Masa, rulet ve kumarhane öğeleri öne çıkacak.
 
 ### Hikâye modu
-- [ ] **Hikâye modu:** "Kumar Babası" hikâyesi (Silas Crane, 1929, Port Halloway) oyuna bölüm bölüm eklenecek. Dört perde: Kral, Çatlaklar, Hesaplaşma, Sıfır. Tema "sıfır", oyunun "tam isabet" fikriyle bağlanabilir. Bölümlerin oynanışa nasıl bağlanacağı (ara sahneler, bekçi turları, karakterler) birlikte belirlenecek.
+- [x] ~~**Hikâye modu**~~ → Prolog, 8 bölüm, kat = bölüm, bölüm sonunda kart/karakter açılır (`docs/tasarim/hikaye-modu.md`)
+- [ ] **Ara sahne illüstrasyonları:** şu anki kodla çizilen siluetler geçici (grafik aşaması, Blender)
+- [ ] **Yarım kalan oyunun kaydı:** uygulama kapanınca masa kaybolmasın, "Devam Et" kayıttan açılsın
 
 ### Ses
 - [ ] **Fon müzikleri:** birkaç parça (menü, oyun, bekçi turu), dark noir caz. Saksafon önde, piyano ve çello arkada. Black'in sahnelerinde aynı tema daha alçak ve yavaş çalacak. Sesi ayarlanabilir olacak.
@@ -99,7 +97,8 @@ Son güncelleme: 9 Kasım 2026
 
 ### Kartlar ve görseller
 - [ ] **Resimli kartlar:** her kart için illüstrasyon (şu an ikon var). Görsellerin kaynağı ve lisansı netleştirilecek.
-- [ ] **Kart ırkları/sınıfları:** önceki Demon/Human/Elf/Oz fikri bırakıldı. Irklar ve sınıflar hikâyeye göre yeniden belirlenecek. Mevcut 4 sınıfın (Muhafız, Simyacı, Kor Büyücüsü, Kâhin) ne olacağına da karar verilecek.
+- [x] ~~**Kart ırkları/sınıfları**~~ → sınıflar hikâye karakterleri oldu: Silas, Eddie, Harlow, Vivienne
+- [ ] **Temaya uygun ikonlar:** karakterlerde ve kartlarda hâlâ eski fantastik ikonlar var (kalkan, şişe, alev…)
 - [x] ~~Ana oynanış ekranının grafik yenilemesi~~ → Art Deco stiline geçildi (yukarıda)
 
 ### Oyun tasarımı
@@ -116,8 +115,5 @@ Son güncelleme: 9 Kasım 2026
 - [x] ~~Yazı tiplerini projeye gömmek~~ → Limelight, Poiret One, Josefin Sans eklendi
 
 ## ❓ Açık sorular
-- Irklar ve sınıflar hikâyeye göre ne olacak?
-- Fantastik öğeler (büyüler, bekçiler, tılsımlar) 1929 noir dünyasında kalacak mı, yoksa kumarhane karşılıkları mı olacak?
-- Hikâye modu oynanışa nasıl bağlanacak?
 - Kart illüstrasyonları kim tarafından hazırlanacak? Stil Dark Deco örneklerindeki gibi olacak.
 - DLC ve Black Market içerikleri, fiyatlandırma
