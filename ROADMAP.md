@@ -1,6 +1,19 @@
 # Tam İsabet — Yol Haritası
 
-Son güncelleme: 4 Kasım 2026
+Son güncelleme: 9 Kasım 2026
+
+## 📍 Kaldığımız yer
+- **Asıl sürüm:** `godot/` (Godot 4.7, iOS hedefli). Oynanabilir, 47 testin hepsi geçiyor, görünüm Art Deco (siyah, altın, fildişi).
+- **Sıradaki iş:** fon müzikleri. Birkaç parça olacak (menü, oyun, bekçi turu), Art Deco temasına uygun caz/swing havasında, sesi ayarlanabilir. Ardından açılışta "elf" karşılama sesi.
+- **Bekleyen büyük kararlar** (aşağıda "Açık sorular"):
+  - çarpansız yeni skor sistemi
+  - Demon/Human/Elf/Oz ırklarının mevcut sınıflarla ilişkisi
+  - kart illüstrasyonları
+  - DLC ve Under Market
+- **Çalışma düzeni:**
+  - Windows bilgisayarda Godot, git ve GitHub CLI kurulu. GitHub hesabı `enkotechh`, depo herkese açık.
+  - Mac'e geçince `git clone` ile devam edilecek. iOS'a çıkış Mac'te yapılacak.
+- **Yeni oturumda:** önce bu dosyayı ve CLAUDE.md'yi oku, testleri çalıştır, sonra sıradaki işe geç.
 
 ## ✅ Yapılanlar
 
